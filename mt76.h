@@ -257,6 +257,17 @@ struct mt76_sband {
 	struct mt76_channel_state *chan;
 };
 
+struct mt76_mmio {
+	struct mt76e_mcu {
+		struct mutex mutex;
+
+		wait_queue_head_t wait;
+		struct sk_buff_head res_q;
+
+		u32 msg_seq;
+	} mcu;
+};
+
 struct mt76_dev {
 	struct ieee80211_hw *hw;
 	struct cfg80211_chan_def chandef;
@@ -305,6 +316,12 @@ struct mt76_dev {
 	char led_name[32];
 	bool led_al;
 	u8 led_pin;
+
+	u32 rxfilter;
+
+	union {
+		struct mt76_mmio mmio;
+	};
 };
 
 enum mt76_phy_type {

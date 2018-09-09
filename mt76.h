@@ -107,6 +107,12 @@ struct mt76_queue {
 	struct sk_buff *rx_head;
 };
 
+struct mt76_mcu_ops {
+	struct sk_buff *(*mcu_msg_alloc)(const void *data, int len);
+	int (*mcu_send_msg)(struct mt76_dev *dev, struct sk_buff *skb,
+			    int cmd, bool wait_resp);
+};
+
 struct mt76_queue_ops {
 	int (*init)(struct mt76_dev *dev);
 
@@ -252,6 +258,7 @@ struct mt76_dev {
 	spinlock_t cc_lock;
 	const struct mt76_bus_ops *bus;
 	const struct mt76_driver_ops *drv;
+	const struct mt76_mcu_ops *mcu_ops;
 	void __iomem *regs;
 	struct device *dev;
 
@@ -347,6 +354,9 @@ struct mt76_rx_status {
 #define mt76_wr(dev, ...)	(dev)->mt76.bus->wr(&((dev)->mt76), __VA_ARGS__)
 #define mt76_rmw(dev, ...)	(dev)->mt76.bus->rmw(&((dev)->mt76), __VA_ARGS__)
 #define mt76_wr_copy(dev, ...)	(dev)->mt76.bus->copy(&((dev)->mt76), __VA_ARGS__)
+
+#define mt76_mcu_msg_alloc(dev, ...)	(dev)->mt76.mcu_ops->mcu_msg_alloc(__VA_ARGS__)
+#define mt76_mcu_send_msg(dev, ...)	(dev)->mt76.mcu_ops->mcu_send_msg(&((dev)->mt76), __VA_ARGS__)
 
 #define mt76_set(dev, offset, val)	mt76_rmw(dev, offset, 0, val)
 #define mt76_clear(dev, offset, val)	mt76_rmw(dev, offset, val, 0)
@@ -495,5 +505,6 @@ void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
 void mt76_rx_poll_complete(struct mt76_dev *dev, enum mt76_rxq_id q,
 			   struct napi_struct *napi);
 void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames);
+void mt76u_init_mcu_ops(struct mt76_dev *dev);
 
 #endif

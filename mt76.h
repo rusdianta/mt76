@@ -219,6 +219,8 @@ struct mt76_txq {
 struct mt76_txwi_cache {
 	struct list_head list;
 	dma_addr_t dma_addr;
+
+	struct sk_buff *skb;
 };
 
 struct mt76_rx_tid {

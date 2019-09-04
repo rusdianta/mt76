@@ -6,6 +6,6 @@ obj-$(CONFIG_MT76_USB) += mt76-usb.o
 
 mt76-y := \
 	mmio.o util.o trace.o dma.o mac80211.o debugfs.o eeprom.o \
-	tx.o agg-rx.o mcu.o
+	tx.o agg-rx.o mcu.o airtime.o
 
 mt76-usb-y := usb.o usb_trace.o

@@ -21,6 +21,8 @@
 #define MT_RX_BUF_SIZE      2048
 #define MT_SKB_HEAD_LEN     128
 
+#define IEEE80211_AMPDU_TX_START_IMMEDIATE 1
+
 struct mt76_dev;
 struct mt76_wcid;
 

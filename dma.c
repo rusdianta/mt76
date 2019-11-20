@@ -141,7 +141,7 @@ mt76_dma_tx_cleanup(struct mt76_dev *dev, enum mt76_txq_id qid, bool flush)
 	struct mt76_sw_queue *sq = &dev->q_tx[qid];
 	struct mt76_queue *q = sq->q;
 	struct mt76_queue_entry entry;
-	unsigned int n_swq_queued[8] = {};
+	unsigned int n_swq_queued[4] = {};
 	unsigned int n_queued = 0;
 	bool wake = false;
 	int i, last;
@@ -178,19 +178,11 @@ mt76_dma_tx_cleanup(struct mt76_dev *dev, enum mt76_txq_id qid, bool flush)
 	spin_lock_bh(&q->lock);
 
 	q->queued -= n_queued;
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < ARRAY_SIZE(n_swq_queued); i++) {
 		if (!n_swq_queued[i])
 			continue;
 
 		dev->q_tx[i].swq_queued -= n_swq_queued[i];
-	}
-
-	/* ext PHY */
-	for (i = 0; i < 4; i++) {
-		if (!n_swq_queued[i])
-			continue;
-
-		dev->q_tx[__MT_TXQ_MAX + i].swq_queued -= n_swq_queued[4 + i];
 	}
 
 	if (flush)
@@ -435,7 +427,7 @@ mt76_dma_rx_reset(struct mt76_dev *dev, enum mt76_rxq_id qid)
 	int i;
 
 	for (i = 0; i < q->ndesc; i++)
-		q->desc[i].ctrl = cpu_to_le32(MT_DMA_CTL_DMA_DONE);
+		q->desc[i].ctrl &= ~cpu_to_le32(MT_DMA_CTL_DMA_DONE);
 
 	mt76_dma_rx_cleanup(dev, q);
 	mt76_dma_sync_idx(dev, q);
@@ -536,8 +528,7 @@ mt76_dma_rx_poll(struct napi_struct *napi, int budget)
 	dev = container_of(napi->dev, struct mt76_dev, napi_dev);
 	qid = napi - dev->napi;
 
-	local_bh_disable();
-	rcu_read_lock();
+	rcu_read_lock_bh();
 
 	do {
 		cur = mt76_dma_rx_process(dev, &dev->q_rx[qid], budget - done);
@@ -545,8 +536,7 @@ mt76_dma_rx_poll(struct napi_struct *napi, int budget)
 		done += cur;
 	} while (cur && done < budget);
 
-	rcu_read_unlock();
-	local_bh_enable();
+	rcu_read_unlock_bh();
 
 	if (done < budget && napi_complete(napi))
 		dev->drv->rx_poll_complete(dev, qid);

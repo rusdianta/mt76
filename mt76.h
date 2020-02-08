@@ -392,6 +392,14 @@ enum mt76u_out_ep {
 	__MT_EP_OUT_MAX,
 };
 
+struct mt76_mcu {
+	struct mutex mutex;
+	u32 msg_seq;
+
+	struct sk_buff_head res_q;
+	wait_queue_head_t wait;
+};
+
 #define MT_TX_SG_MAX_SIZE	8
 #define MT_RX_SG_MAX_SIZE	4
 #define MT_NUM_TX_ENTRIES	256
@@ -412,10 +420,7 @@ struct mt76_usb {
 	bool sg_en;
 
 	struct mt76u_mcu {
-		struct mutex mutex;
 		u8 *data;
-		u32 msg_seq;
-
 		/* multiple reads */
 		struct mt76_reg_pair *rp;
 		int rp_len;
@@ -425,14 +430,6 @@ struct mt76_usb {
 };
 
 struct mt76_mmio {
-	struct mt76e_mcu {
-		struct mutex mutex;
-
-		wait_queue_head_t wait;
-		struct sk_buff_head res_q;
-
-		u32 msg_seq;
-	} mcu;
 	void __iomem *regs;
 	spinlock_t irq_lock;
 	u32 irqmask;
@@ -509,6 +506,8 @@ struct mt76_dev {
 	const struct mt76_driver_ops *drv;
 	const struct mt76_mcu_ops *mcu_ops;
 	struct device *dev;
+
+	struct mt76_mcu mcu;
 
 	struct net_device napi_dev;
 	spinlock_t rx_lock;

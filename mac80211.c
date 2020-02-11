@@ -927,14 +927,9 @@ int mt76_get_txpower(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 {
 	struct mt76_dev *dev = hw->priv;
 	int n_chains = hweight8(dev->antenna_mask);
+	int delta = mt76_tx_power_nss_delta(n_chains);
 
-	*dbm = DIV_ROUND_UP(dev->txpower_cur, 2);
-
-	/* convert from per-chain power to combined
-	 * output on 2x2 devices
-	 */
-	if (n_chains > 1)
-		*dbm += 3;
+	*dbm = DIV_ROUND_UP(dev->txpower_cur + delta, 2);
 
 	return 0;
 }

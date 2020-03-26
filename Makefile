@@ -1,5 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
 EXTRA_CFLAGS += -Werror -DCONFIG_MT76_LEDS
-
 obj-m := mt76.o
 obj-$(CONFIG_MT7603E) += mt7603/
 obj-$(CONFIG_MT76_USB) += mt76-usb.o
@@ -11,3 +11,6 @@ mt76-y := \
 mt76-$(CONFIG_PCI) += pci.o
 
 mt76-usb-y := usb.o usb_trace.o
+
+CFLAGS_trace.o := -I$(src)
+CFLAGS_usb_trace.o := -I$(src)

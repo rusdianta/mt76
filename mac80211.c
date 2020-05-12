@@ -356,6 +356,8 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 #ifdef CONFIG_MAC80211_MESH
 		BIT(NL80211_IFTYPE_MESH_POINT) |
 #endif
+		BIT(NL80211_IFTYPE_P2P_CLIENT) |
+		BIT(NL80211_IFTYPE_P2P_GO) |
 		BIT(NL80211_IFTYPE_ADHOC);
 
 	if (dev->cap.has_2ghz) {

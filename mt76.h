@@ -426,7 +426,7 @@ struct mt76_dev {
 	wait_queue_head_t tx_wait;
 	struct sk_buff_head status_list;
 
-	unsigned long wcid_mask[MT76_N_WCIDS / BITS_PER_LONG];
+	u32 wcid_mask[DIV_ROUND_UP(MT76_N_WCIDS, 32)];
 
 	struct mt76_wcid global_wcid;
 	struct mt76_wcid __rcu *wcid[MT76_N_WCIDS];

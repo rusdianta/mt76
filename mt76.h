@@ -279,9 +279,10 @@ struct mt76_hw_cap {
 	bool has_5ghz;
 };
 
-#define MT_DRV_TXWI_NO_FREE		BIT(0)
+#define MT_DRV_TXWI_NO_FREE			BIT(0)
 #define MT_DRV_TX_ALIGNED4_SKBS		BIT(1)
 #define MT_DRV_SW_RX_AIRTIME		BIT(2)
+#define MT_DRV_HW_MGMT_TXQ			BIT(4)
 #define MT_DRV_AMSDU_OFFLOAD		BIT(5)
 
 struct mt76_driver_ops {

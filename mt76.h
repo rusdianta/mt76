@@ -376,7 +376,6 @@ struct mt76_usb {
 	u16 data_len;
 
 	struct tasklet_struct rx_tasklet;
-	struct workqueue_struct *wq;
 	struct work_struct stat_work;
 
 	u8 out_ep[__MT_EP_OUT_MAX];
@@ -509,6 +508,8 @@ struct mt76_dev {
 	ktime_t survey_time;
 
 	u32 rxfilter;
+
+	struct workqueue_struct *wq;
 
 	union {
 		struct mt76_mmio mmio;

@@ -2,6 +2,7 @@
 /*
  * Copyright (C) 2016 Felix Fietkau <nbd@nbd.name>
  */
+#include <uapi/linux/sched/types.h>
 #include <linux/of.h>
 #include "mt76.h"
 
@@ -304,8 +305,6 @@ mt76_alloc_device(struct device *pdev, unsigned int size,
 	for (i = 0; i < ARRAY_SIZE(dev->q_rx); i++)
 		skb_queue_head_init(&dev->rx_skb[i]);
 
-	tasklet_init(&dev->tx_tasklet, mt76_tx_tasklet, (unsigned long)dev);
-
 	dev->wq = alloc_ordered_workqueue("mt76", 0);
 	if (!dev->wq) {
 		ieee80211_free_hw(hw);
@@ -319,6 +318,7 @@ EXPORT_SYMBOL_GPL(mt76_alloc_device);
 int mt76_register_device(struct mt76_dev *dev, bool vht,
 			 struct ieee80211_rate *rates, int n_rates)
 {
+	struct sched_param sparam = {.sched_priority = 1};
 	struct ieee80211_hw *hw = dev->hw;
 	struct wiphy *wiphy = hw->wiphy;
 	int ret;
@@ -395,7 +395,14 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 			return ret;
 	}
 
-	return ieee80211_register_hw(hw);
+	ret = ieee80211_register_hw(hw);
+	if (ret)
+		return ret;
+
+	WARN_ON(mt76_worker_setup(hw, &dev->tx_worker, mt76_tx_worker, "tx"));
+	sched_setscheduler(dev->tx_worker.task, SCHED_FIFO, &sparam);
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(mt76_register_device);
 
@@ -412,6 +419,7 @@ EXPORT_SYMBOL_GPL(mt76_unregister_device);
 
 void mt76_free_device(struct mt76_dev *dev)
 {
+	mt76_worker_teardown(&dev->tx_worker);
 	if (dev->wq) {
 		destroy_workqueue(dev->wq);
 		dev->wq = NULL;

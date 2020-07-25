@@ -83,7 +83,8 @@ enum mt76_rxq_id {
 
 struct mt76_queue_buf {
 	dma_addr_t addr;
-	int len;
+	u16 len;
+	bool skip_unmap;
 };
 
 struct mt76_tx_info {
@@ -105,6 +106,7 @@ struct mt76_queue_entry {
 	};
 	enum mt76_txq_id qid;
 	bool skip_buf0:1;
+	bool skip_buf1:1;
 	bool schedule:1;
 	bool done:1;
 };

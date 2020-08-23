@@ -618,8 +618,8 @@ void mt76_queue_tx_complete(struct mt76_dev *dev, struct mt76_queue *q,
 {
     enum mt76_txq_id qid = e->qid;
 
-    if (e->skb)
-        dev->drv->tx_complete_skb(dev, qid, e);
+	if (e->skb)
+		dev->drv->tx_complete_skb(dev, e);
 
     spin_lock_bh(&q->lock);
     q->tail = (q->tail + 1) % q->ndesc;

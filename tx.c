@@ -620,3 +620,21 @@ u8 mt76_ac_to_hwq(u8 ac)
 	return wmm_queue_map[ac];
 }
 EXPORT_SYMBOL_GPL(mt76_ac_to_hwq);
+
+void mt76_queue_tx_complete(struct mt76_dev *dev, struct mt76_queue *q,
+			    struct mt76_queue_entry *e)
+{
+	enum mt76_txq_id qid = e->qid % 4;
+
+	if (e->skb)
+		dev->drv->tx_complete_skb(dev, qid, e);
+
+	spin_lock_bh(&q->lock);
+	q->tail = (q->tail + 1) % q->ndesc;
+	q->queued--;
+
+	if (e->schedule)
+		dev->q_tx[qid].swq_queued--;
+	spin_unlock_bh(&q->lock);
+}
+EXPORT_SYMBOL_GPL(mt76_queue_tx_complete);

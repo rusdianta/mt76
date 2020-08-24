@@ -21,7 +21,6 @@ enum nl80211_ext_feature_index_alt {
 	NL80211_EXT_FEATURE_AQL = 40
 };
 
-#define MT_TX_RING_SIZE     256
 #define MT_MCU_RING_SIZE    32
 #define MT_RX_BUF_SIZE      2048
 #define MT_SKB_HEAD_LEN     128

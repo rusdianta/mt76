@@ -463,8 +463,11 @@ mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_queue *q,
 		return idx;
 
 	do {
-		if (test_bit(MT76_RESET, &dev->state) || stop)
+		if (test_bit(MT76_RESET, &dev->state))
 			return -EBUSY;
+
+		if (stop)
+			break;
 
 		if (q->queued + MT_TXQ_FREE_THR >= q->ndesc)
 			break;

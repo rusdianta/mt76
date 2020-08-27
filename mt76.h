@@ -96,6 +96,8 @@ struct mt76_queue_entry {
 		struct urb *urb;
 	};
 	u16 wcid;
+	u32 dma_addr[2];
+	u16 dma_len[2];
 	bool skip_buf0:1;
 	bool skip_buf1:1;
 	bool done:1;

@@ -207,10 +207,7 @@ struct mt76_wcid {
 };
 
 struct mt76_txq {
-	struct mt76_queue *q;
 	struct mt76_wcid *wcid;
-
-	struct sk_buff_head retry_q;
 
 	u16 agg_ssn;
 	bool send_bar;
@@ -692,8 +689,6 @@ static inline u8 mt76_tx_power_nss_delta(u8 nss)
 void mt76_rx(struct mt76_dev *dev, enum mt76_rxq_id q, struct sk_buff *skb);
 void mt76_tx(struct mt76_dev *dev, struct ieee80211_sta *sta,
 	     struct mt76_wcid *wcid, struct sk_buff *skb);
-void mt76_txq_init(struct mt76_dev *dev, struct ieee80211_txq *txq);
-void mt76_txq_remove(struct mt76_dev *dev, struct ieee80211_txq *txq);
 void mt76_wake_tx_queue(struct ieee80211_hw *hw, struct ieee80211_txq *txq);
 void mt76_stop_tx_queues(struct mt76_dev *dev, struct ieee80211_sta *sta,
 			 bool send_bar);

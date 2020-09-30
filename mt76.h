@@ -136,6 +136,8 @@ struct mt76_queue {
 struct mt76_mcu_ops {
 	int (*mcu_send_msg)(struct mt76_dev *dev, int cmd, const void *data,
 			    int len, bool wait_resp);
+	int (*mcu_skb_send_msg)(struct mt76_dev *dev, struct sk_buff *skb,
+				int cmd, int *seq);
 	int (*mcu_parse_response)(struct mt76_dev *dev, int cmd,
 				  struct sk_buff *skb, int seq);
 	int (*mcu_wr_rp)(struct mt76_dev *dev, u32 base,
@@ -363,6 +365,7 @@ enum mt76u_out_ep {
 struct mt76_mcu {
 	struct mutex mutex;
 	u32 msg_seq;
+	int timeout;
 
 	struct sk_buff_head res_q;
 	wait_queue_head_t wait;
@@ -779,6 +782,8 @@ mt76_mcu_msg_alloc(const void *data, int head_len,
 void mt76_mcu_rx_event(struct mt76_dev *dev, struct sk_buff *skb);
 struct sk_buff *mt76_mcu_get_response(struct mt76_dev *dev,
 				      unsigned long expires);
+int mt76_mcu_skb_send_msg(struct mt76_dev *dev, struct sk_buff *skb,
+			  int cmd, bool wait_resp);
 
 void mt76_set_irq_mask(struct mt76_dev *dev, u32 addr, u32 clear, u32 set);
 

@@ -921,7 +921,8 @@ int mt76_mcu_send_msg(struct mt76_dev *dev, int cmd, const void *data,
 		      int len, bool wait_resp);
 int mt76_mcu_skb_send_msg(struct mt76_dev *dev, struct sk_buff *skb,
 			  int cmd, bool wait_resp);
-
+int mt76_mcu_send_firmware(struct mt76_dev *dev, int cmd, const void *data,
+			   int len);
 void mt76_set_irq_mask(struct mt76_dev *dev, u32 addr, u32 clear, u32 set);
 
 s8 mt76_get_rate_power_limits(struct mt76_dev *dev,

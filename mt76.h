@@ -379,6 +379,7 @@ struct mt76_usb {
 	u8 *data;
 	u16 data_len;
 
+	struct mt76_worker status_worker;
 	struct mt76_worker rx_worker;
 	struct work_struct stat_work;
 

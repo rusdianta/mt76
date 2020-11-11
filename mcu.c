@@ -116,7 +116,7 @@ int mt76_mcu_send_firmware(struct mt76_dev *dev, int cmd, const void *data,
 		len -= cur_len;
 
 		if (dev->queue_ops->tx_cleanup)
-			dev->queue_ops->tx_cleanup(dev, dev->q_tx[MT_TXQ_FWDL].q,
+			dev->queue_ops->tx_cleanup(dev, dev->q_mcu[MT_MCUQ_FWDL],
 						   false);
 	}
 

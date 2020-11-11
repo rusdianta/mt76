@@ -1434,6 +1434,8 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
 
 	mt7603_pse_client_reset(dev);
 
+	mt76_queue_tx_cleanup(dev, dev->mt76.q_mcu[MT_MCUQ_WM], true);
+
 	for (i = 0; i < ARRAY_SIZE(dev->mt76.q_tx); i++)
 		mt76_queue_tx_cleanup(dev, dev->mt76.q_tx[i].q, true);
 

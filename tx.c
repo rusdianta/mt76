@@ -422,6 +422,7 @@ static int
 mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 {
 	struct mt76_sw_queue *sq = &dev->q_tx[qid];	
+	struct mt76_queue *q = sq->q;
 	struct ieee80211_txq *txq;
 	struct mt76_txq *mtxq;
 	struct mt76_wcid *wcid;
@@ -436,6 +437,16 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 		if (test_bit(MT76_STATE_PM, &dev->state) ||
 		    test_bit(MT76_RESET, &dev->state))
 			return -EBUSY;
+
+		if (sq->stopped)
+			break;
+
+		if (dev->queue_ops->tx_cleanup &&
+		    q->queued + 2 * MT_TXQ_FREE_THR >= q->ndesc) {
+			spin_unlock_bh(&q->lock);
+			dev->queue_ops->tx_cleanup(dev, qid, false);
+			spin_lock_bh(&q->lock);
+		}
 
 		txq = ieee80211_next_txq(dev->hw, qid);
 		if (!txq)

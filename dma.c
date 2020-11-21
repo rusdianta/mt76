@@ -124,6 +124,7 @@ mt76_dma_alloc_queue(struct mt76_dev *dev, struct mt76_queue *q,
 	int size;
 
 	spin_lock_init(&q->lock);
+	spin_lock_init(&q->cleanup_lock);
 
 	q->regs = dev->mmio.regs + ring_base + idx * MT_RING_SIZE;
 	q->ndesc = n_desc;
@@ -279,6 +280,7 @@ mt76_dma_tx_cleanup(struct mt76_dev *dev, enum mt76_txq_id qid, bool flush)
 	if (!q || !q->ndesc)
 		return;
 
+	spin_lock_bh(&q->cleanup_lock);
 	if (flush)
 		last = -1;
 	else
@@ -314,6 +316,7 @@ mt76_dma_tx_cleanup(struct mt76_dev *dev, enum mt76_txq_id qid, bool flush)
 
 		dev->q_tx[i].swq_queued -= n_swq_queued[i];
 	}
+	spin_unlock_bh(&q->cleanup_lock);
 
 	if (flush) {
 		mt76_dma_sync_idx(dev, q);

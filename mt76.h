@@ -19,6 +19,7 @@
 #define MT_MCU_RING_SIZE	32
 #define MT_RX_BUF_SIZE		2048
 #define MT_SKB_HEAD_LEN		256
+#define MT_TXQ_FREE_THR     8
 
 #define IEEE80211_AMPDU_TX_START_IMMEDIATE 1
 /* for tx_highest */
@@ -157,6 +158,7 @@ struct mt76_queue {
 	struct mt76_queue_regs __iomem *regs;
 
 	spinlock_t lock;
+	spinlock_t cleanup_lock;
 	struct mt76_queue_entry *entry;
 	struct mt76_desc *desc;
 

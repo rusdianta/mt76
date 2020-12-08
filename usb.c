@@ -821,6 +821,9 @@ static void mt76u_status_worker(struct mt76_worker *w)
 		sq = &dev->q_tx[i];
 		q = sq->q;
 
+		if (!q)
+			continue;
+
 		while (q->queued > n_dequeued) {
 			if (!q->entry[q->tail].done)
 				break;

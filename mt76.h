@@ -72,6 +72,10 @@ enum mt76_rxq_id {
 	__MT_RXQ_MAX
 };
 
+enum mac80211_rx_flags_dev {	
+	RX_FLAG_8023			= BIT(30),
+};
+
 enum nl80211_ext_feature_index_dev {	
 	NL80211_EXT_FEATURE_AQL = 40,
 };
@@ -473,7 +477,7 @@ struct mt76_rx_status {
 	u8 iv[6];
 
 	u8 aggr:1;
-	u8 tid;
+	u8 qos_ctl;
 	u16 seqno;
 
 	u16 freq;

@@ -588,6 +588,9 @@ struct mt76_phy {
 #ifdef CONFIG_NL80211_TESTMODE
 	struct mt76_testmode_data test;
 #endif
+
+	struct delayed_work mac_work;
+	u8 mac_work_count;
 };
 
 struct mt76_dev {
@@ -628,7 +631,6 @@ struct mt76_dev {
 
 	struct mt76_worker tx_worker;
 	struct napi_struct tx_napi;
-	struct delayed_work mac_work;
 
 	wait_queue_head_t tx_wait;
 	struct sk_buff_head status_list;

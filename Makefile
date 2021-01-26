@@ -19,4 +19,4 @@ mt76-sdio-y := sdio.o
 CFLAGS_trace.o := -I$(src)
 CFLAGS_usb_trace.o := -I$(src)
 
-mt76-connac-lib-y := mt76_connac_mcu.o
+mt76-connac-lib-y := mt76_connac_mcu.o mt76_connac_mac.o

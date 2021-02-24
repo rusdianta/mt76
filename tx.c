@@ -400,14 +400,14 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 	int ret = 0;
 
 	while (1) {
+		int n_frames = 0;
+
 		if (sq->swq_queued >= 4)
 			break;
 
 		if (test_bit(MT76_STATE_PM, &dev->state) ||
-		    test_bit(MT76_RESET, &dev->state)) {
-			ret = -EBUSY;
-			break;
-		}
+		    test_bit(MT76_RESET, &dev->state))
+			return -EBUSY;
 
 		txq = ieee80211_next_txq(dev->hw, qid);
 		if (!txq)
@@ -431,13 +431,19 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 			spin_unlock_bh(&hwq->lock);
 			ieee80211_send_bar(vif, sta->addr, tid, agg_ssn);
 			spin_lock_bh(&hwq->lock);
-		}
+		}		
+
+		n_frames = mt76_txq_send_burst(dev, sq, mtxq);
 
 		spin_unlock_bh(&hwq->lock);
 
-		ret += mt76_txq_send_burst(dev, sq, mtxq);
 		ieee80211_return_txq(dev->hw, txq,
 				     !skb_queue_empty(&mtxq->retry_q));
+
+		if (unlikely(n_frames < 0))
+			return n_frames;
+
+		ret += n_frames;
 	}
 
 	return ret;

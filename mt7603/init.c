@@ -557,6 +557,9 @@ int mt7603_register_device(struct mt7603_dev *dev)
 	hw->max_rate_tries = 11;
 	hw->max_tx_fragments = 1;
 
+	hw->radiotap_timestamp.units_pos =
+		IEEE80211_RADIOTAP_TIMESTAMP_UNIT_US;
+
 	hw->sta_data_size = sizeof(struct mt7603_sta);
 	hw->vif_data_size = sizeof(struct mt7603_vif);
 

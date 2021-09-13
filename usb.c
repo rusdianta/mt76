@@ -900,7 +900,7 @@ void mt76u_stop_tx(struct mt76_dev *dev)
 	cancel_work_sync(&dev->usb.stat_work);
 	clear_bit(MT76_READING_STATS, &dev->state);
 
-	mt76_tx_status_check(dev, NULL, true);
+	mt76_tx_status_check(dev, true);
 }
 EXPORT_SYMBOL_GPL(mt76u_stop_tx);
 

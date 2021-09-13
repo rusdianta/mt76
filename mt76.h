@@ -868,8 +868,7 @@ struct sk_buff *mt76_tx_status_skb_get(struct mt76_dev *dev,
 void mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb,
 			     struct sk_buff_head *list);
 void mt76_tx_complete_skb(struct mt76_dev *dev, struct sk_buff *skb);
-void mt76_tx_status_check(struct mt76_dev *dev, struct mt76_wcid *wcid,
-			  bool flush);
+void mt76_tx_status_check(struct mt76_dev *dev, bool flush);
 int mt76_sta_state(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		   struct ieee80211_sta *sta,
 		   enum ieee80211_sta_state old_state,
@@ -1005,7 +1004,7 @@ mt76_packet_id_flush(struct mt76_dev *dev, struct mt76_wcid *wcid)
 	mt76_tx_status_lock(dev, &list);
 	mt76_tx_status_skb_get(dev, wcid, -1, &list);
 	mt76_tx_status_unlock(dev, &list);
-	
+
 	idr_destroy(&wcid->pktid);
 }
 

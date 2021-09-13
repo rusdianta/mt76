@@ -555,7 +555,8 @@ struct mt76_dev {
 	struct delayed_work mac_work;
 
 	wait_queue_head_t tx_wait;
-	struct sk_buff_head status_list;
+	/* spinclock used to protect wcid pktid linked list */
+	spinlock_t status_lock;
 
 	unsigned long wcid_mask[MT76_N_WCIDS / BITS_PER_LONG];
 
@@ -856,9 +857,9 @@ void mt76_wcid_key_setup(struct mt76_dev *dev, struct mt76_wcid *wcid,
 			 struct ieee80211_key_conf *key);
 
 void mt76_tx_status_lock(struct mt76_dev *dev, struct sk_buff_head *list)
-			 __acquires(&dev->status_list.lock);
+			 __acquires(&dev->status_lock);
 void mt76_tx_status_unlock(struct mt76_dev *dev, struct sk_buff_head *list)
-			   __releases(&dev->status_list.lock);
+			   __releases(&dev->status_lock);
 
 int mt76_tx_status_skb_add(struct mt76_dev *dev, struct mt76_wcid *wcid,
 			   struct sk_buff *skb);

@@ -38,20 +38,20 @@ EXPORT_SYMBOL_GPL(mt76_tx_check_agg_ssn);
 
 void
 mt76_tx_status_lock(struct mt76_dev *dev, struct sk_buff_head *list)
-		   __acquires(&dev->status_list.lock)
+		   __acquires(&dev->status_lock)
 {
 	__skb_queue_head_init(list);
-	spin_lock_bh(&dev->status_list.lock);
+	spin_lock_bh(&dev->status_lock);
 }
 EXPORT_SYMBOL_GPL(mt76_tx_status_lock);
 
 void
 mt76_tx_status_unlock(struct mt76_dev *dev, struct sk_buff_head *list)
-		      __releases(&dev->status_list.lock)
+		      __releases(&dev->status_lock)
 {
 	struct sk_buff *skb;
 
-	spin_unlock_bh(&dev->status_list.lock);
+	spin_unlock_bh(&dev->status_lock);
 
 	while ((skb = __skb_dequeue(list)) != NULL)
 		ieee80211_tx_status(dev->hw, skb);
@@ -110,7 +110,7 @@ mt76_tx_status_skb_add(struct mt76_dev *dev, struct mt76_wcid *wcid,
 			     IEEE80211_TX_CTL_RATE_CTRL_PROBE)))
 		return MT_PACKET_ID_NO_SKB;
 
-	spin_lock_bh(&dev->status_list.lock);
+	spin_lock_bh(&dev->status_lock);
 
 	pid = idr_alloc(&wcid->pktid, skb, MT_PACKET_ID_FIRST,
 			MT_PACKET_ID_MASK, GFP_ATOMIC);
@@ -127,7 +127,7 @@ mt76_tx_status_skb_add(struct mt76_dev *dev, struct mt76_wcid *wcid,
 		list_add_tail(&wcid->list, &dev->wcid_list);
 
 out:
-	spin_unlock_bh(&dev->status_list.lock);
+	spin_unlock_bh(&dev->status_lock);
 
 	return pid;
 }
@@ -140,7 +140,7 @@ mt76_tx_status_skb_get(struct mt76_dev *dev, struct mt76_wcid *wcid, int pktid,
 	struct sk_buff *skb;
 	int id;
 
-	lockdep_assert_held(&dev->status_list.lock);
+	lockdep_assert_held(&dev->status_lock);
 
 	skb = idr_remove(&wcid->pktid, pktid);
 	if (skb)

@@ -1150,3 +1150,31 @@ int mt76_get_antenna(struct ieee80211_hw *hw, u32 *tx_ant, u32 *rx_ant)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(mt76_get_antenna);
+
+void mt76_ethtool_worker(struct mt76_ethtool_worker_info *wi,
+			 struct mt76_sta_stats *stats)
+{
+	int i, ei = wi->initial_stat_idx;
+	u64 *data = wi->data;
+
+	wi->sta_count++;
+
+	data[ei++] += stats->tx_mode[MT_PHY_TYPE_CCK];
+	data[ei++] += stats->tx_mode[MT_PHY_TYPE_OFDM];
+	data[ei++] += stats->tx_mode[MT_PHY_TYPE_HT];
+	data[ei++] += stats->tx_mode[MT_PHY_TYPE_HT_GF];
+	data[ei++] += stats->tx_mode[MT_PHY_TYPE_VHT];
+	data[ei++] += stats->tx_mode[MT_PHY_TYPE_HE_SU];
+	data[ei++] += stats->tx_mode[MT_PHY_TYPE_HE_EXT_SU];
+	data[ei++] += stats->tx_mode[MT_PHY_TYPE_HE_TB];
+	data[ei++] += stats->tx_mode[MT_PHY_TYPE_HE_MU];
+
+	for (i = 0; i < ARRAY_SIZE(stats->tx_bw); i++)
+		data[ei++] += stats->tx_bw[i];
+
+	for (i = 0; i < 12; i++)
+		data[ei++] += stats->tx_mcs[i];
+		
+	wi->worker_stat_count = ei - wi->initial_stat_idx;
+}
+EXPORT_SYMBOL_GPL(mt76_ethtool_worker);

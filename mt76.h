@@ -16,9 +16,9 @@
 #include <net/mac80211.h>
 #include "util.h"
 
-#define MT_MCU_RING_SIZE    32
-#define MT_RX_BUF_SIZE      2048
-#define MT_SKB_HEAD_LEN     128
+#define MT_MCU_RING_SIZE	32
+#define MT_RX_BUF_SIZE		2048
+#define MT_SKB_HEAD_LEN		256
 
 #define IEEE80211_AMPDU_TX_START_IMMEDIATE 1
 

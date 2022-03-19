@@ -361,7 +361,9 @@ mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_sw_queue *sq,
 	ampdu = IEEE80211_SKB_CB(skb)->flags & IEEE80211_TX_CTL_AMPDU;
 	limit = ampdu ? 16 : 3;
 
+	spin_lock(&sq->q->lock);
 	idx = dev->queue_ops->tx_queue_skb(dev, qid, skb, wcid, txq->sta);
+	spin_unlock(&sq->q->lock);
 
 	if (idx < 0)
 		return idx;
@@ -391,8 +393,11 @@ mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_sw_queue *sq,
 
 		info->control.rates[0] = tx_rate;
 
+		spin_lock(&sq->q->lock);
 		idx = dev->queue_ops->tx_queue_skb(dev, qid, skb, wcid,
 						   txq->sta);
+		spin_unlock(&sq->q->lock);
+
 		if (idx < 0)
 			return idx;
 
@@ -405,7 +410,9 @@ mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_sw_queue *sq,
 		sq->swq_queued++;
 	}
 
+	spin_lock(&sq->q->lock);
 	dev->queue_ops->kick(dev, hwq);
+	spin_unlock(&sq->q->lock);
 
 	return n_frames;
 }
@@ -439,8 +446,6 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 		if (wcid && test_bit(MT_WCID_FLAG_PS, &wcid->flags))
 			continue;
 
-		spin_lock_bh(&hwq->lock);	
-
 		if (mtxq->send_bar && mtxq->aggr) {
 			struct ieee80211_txq *txq = mtxq_to_txq(mtxq);
 			struct ieee80211_sta *sta = txq->sta;
@@ -449,14 +454,10 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 			u8 tid = txq->tid;
 
 			mtxq->send_bar = false;
-			spin_unlock_bh(&hwq->lock);
 			ieee80211_send_bar(vif, sta->addr, tid, agg_ssn);
-			spin_lock_bh(&hwq->lock);
 		}		
 
 		n_frames = mt76_txq_send_burst(dev, sq, mtxq);
-
-		spin_unlock_bh(&hwq->lock);
 
 		ieee80211_return_txq(dev->hw, txq,
 				     !skb_queue_empty(&mtxq->retry_q));
@@ -481,6 +482,7 @@ void mt76_txq_schedule(struct mt76_dev *dev, enum mt76_txq_id qid)
 	if (sq->swq_queued >= 4)
 		return;
 
+	local_bh_disable();
 	rcu_read_lock();
 
 	do {
@@ -490,6 +492,7 @@ void mt76_txq_schedule(struct mt76_dev *dev, enum mt76_txq_id qid)
 	} while (len > 0);
 
 	rcu_read_unlock();
+	local_bh_enable();
 }
 EXPORT_SYMBOL_GPL(mt76_txq_schedule);
 

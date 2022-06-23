@@ -700,7 +700,7 @@ static struct ieee80211_sta *mt76_rx_convert(struct sk_buff *skb)
 	return wcid_to_sta(mstat.wcid);
 }
 
-static int
+static void
 mt76_check_ccmp_pn(struct sk_buff *skb)
 {
 	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
@@ -710,13 +710,13 @@ mt76_check_ccmp_pn(struct sk_buff *skb)
 	int ret;
 
 	if (!(status->flag & RX_FLAG_DECRYPTED))
-		return 0;
+		return;
 
 	if (status->flag & RX_FLAG_ONLY_MONITOR)
-		return 0;
+		return;
 
 	if (!wcid || !wcid->rx_check_pn)
-		return 0;
+		return;
 
 	security_idx = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
 	if (status->flag & RX_FLAG_8023)
@@ -730,7 +730,7 @@ mt76_check_ccmp_pn(struct sk_buff *skb)
 		 */
 		if (ieee80211_is_frag(hdr) &&
 		    !ieee80211_is_first_frag(hdr->frame_control))
-			return 0;
+			return;
 	}
 
 	/* IEEE 802.11-2020, 12.5.3.4.4 "PN and replay detection" c):
@@ -747,15 +747,15 @@ skip_hdr_check:
 	BUILD_BUG_ON(sizeof(status->iv) != sizeof(wcid->rx_key_pn[0]));
 	ret = memcmp(status->iv, wcid->rx_key_pn[security_idx],
 		     sizeof(status->iv));
-	if (ret <= 0)
-		return -EINVAL; /* replay */
+	if (ret <= 0) {
+		status->flag |= RX_FLAG_ONLY_MONITOR;
+		return;
+	}
 
 	memcpy(wcid->rx_key_pn[security_idx], status->iv, sizeof(status->iv));
 
 	if (status->flag & RX_FLAG_IV_STRIPPED)
 		status->flag |= RX_FLAG_PN_VALIDATED;
-
-	return 0;
 }
 
 static void
@@ -929,11 +929,7 @@ void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
 
 	spin_lock(&dev->rx_lock);
 	while ((skb = __skb_dequeue(frames)) != NULL) {
-		if (mt76_check_ccmp_pn(skb)) {
-			dev_kfree_skb(skb);
-			continue;
-		}
-
+		mt76_check_ccmp_pn(skb);
 		sta = mt76_rx_convert(skb);
 		ieee80211_rx_napi(dev->hw, sta, skb, napi);
 	}

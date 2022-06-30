@@ -982,12 +982,12 @@ void mt76u_queues_deinit(struct mt76_dev *dev);
 
 struct sk_buff *
 __mt76_mcu_msg_alloc(struct mt76_dev *dev, const void *data,
-		     int data_len, gfp_t gfp);
+		     int len, int data_len, gfp_t gfp);
 static inline struct sk_buff *
 mt76_mcu_msg_alloc(struct mt76_dev *dev, const void *data,
 		   int data_len)
 {
-	return __mt76_mcu_msg_alloc(dev, data, data_len, GFP_KERNEL);
+	return __mt76_mcu_msg_alloc(dev, data, data_len, data_len, GFP_KERNEL);
 }
 
 void mt76_mcu_rx_event(struct mt76_dev *dev, struct sk_buff *skb);

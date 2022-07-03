@@ -180,9 +180,9 @@ struct mt76_queue_ops {
 		     int idx, int n_desc, int bufsize,
 		     u32 ring_base);
 
-	int (*tx_queue_skb)(struct mt76_dev *dev, enum mt76_txq_id qid,
-			    struct sk_buff *skb, struct mt76_wcid *wcid,
-			    struct ieee80211_sta *sta);
+	int (*tx_queue_skb)(struct mt76_dev *dev, struct mt76_queue *q,
+			    enum mt76_txq_id qid, struct sk_buff *skb,
+			    struct mt76_wcid *wcid, struct ieee80211_sta *sta);
 
 	int (*tx_queue_skb_raw)(struct mt76_dev *dev, enum mt76_txq_id qid,
 				struct sk_buff *skb, u32 tx_info);

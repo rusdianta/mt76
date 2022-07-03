@@ -238,14 +238,14 @@ __mt76_tx_queue_skb(struct mt76_dev *dev, int qid, struct sk_buff *skb,
 		    bool *stop)
 {
 	//struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
-	struct mt76_queue *q;
+	struct mt76_queue *q = dev->q_tx[qid];
 	bool non_aql;
 	int pending;
 	int idx;
 
 	// Linux kernel 4.14.275 does not support AQL yet.
 	non_aql = true; // !info->tx_time_est;
-	idx = dev->queue_ops->tx_queue_skb(dev, qid, skb, wcid, sta);
+	idx = dev->queue_ops->tx_queue_skb(dev, q, qid, skb, wcid, sta);
 	if (idx < 0 || !sta)
 		return idx;
 

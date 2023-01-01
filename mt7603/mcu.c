@@ -230,7 +230,7 @@ int mt7603_mcu_init(struct mt7603_dev *dev)
 
 void mt7603_mcu_exit(struct mt7603_dev *dev)
 {
-	__mt76_mcu_restart(&dev->mt76);
+	mt7603_mcu_restart(&dev->mt76);
 	skb_queue_purge(&dev->mt76.mcu.res_q);
 }
 

@@ -53,8 +53,11 @@ mt76_tx_status_unlock(struct mt76_dev *dev, struct sk_buff_head *list)
 
 	spin_unlock_bh(&dev->status_lock);
 
-	while ((skb = __skb_dequeue(list)) != NULL)
+	while ((skb = __skb_dequeue(list)) != NULL) {
+		spin_lock_bh(&dev->mt76.rx_lock);
 		ieee80211_tx_status(dev->hw, skb);
+		spin_unlock_bh(&dev->mt76.rx_lock);
+	}
 }
 EXPORT_SYMBOL_GPL(mt76_tx_status_unlock);
 

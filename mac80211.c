@@ -329,6 +329,8 @@ mt76_alloc_device(struct device *pdev, unsigned int size,
 	dev->tx_worker.fn = mt76_tx_worker;
 
 	INIT_LIST_HEAD(&dev->wcid_list);
+	INIT_LIST_HEAD(&dev->sta_poll_list);
+	spin_lock_init(&dev->sta_poll_lock);
 
 	INIT_LIST_HEAD(&dev->txwi_cache);
 

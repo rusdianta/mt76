@@ -583,6 +583,9 @@ struct mt76_dev {
 	struct list_head wcid_list;
 
 	u8 macaddr[ETH_ALEN];
+	struct list_head sta_poll_list;
+	spinlock_t sta_poll_lock;
+
 	u32 rev;
 	unsigned long state;
 

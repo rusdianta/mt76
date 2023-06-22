@@ -260,6 +260,8 @@ struct mt76_wcid {
 	struct ewma_signal rssi;
 	int inactive_count;
 
+	unsigned long ampdu_state;
+
 	u8 idx;
 	u8 hw_key_idx;
 

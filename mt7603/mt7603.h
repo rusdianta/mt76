@@ -109,9 +109,6 @@ struct mt7603_dev {
 
 	u8 vif_mask;
 
-	struct list_head sta_poll_list;
-	spinlock_t sta_poll_lock;
-
 	struct mt7603_sta global_sta;
 
 	u32 agc0, agc3;

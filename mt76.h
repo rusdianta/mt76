@@ -275,6 +275,8 @@ struct mt76_wcid {
 
 	struct list_head list;
 	struct idr pktid;
+
+	struct list_head poll_list;
 };
 
 struct mt76_txq {

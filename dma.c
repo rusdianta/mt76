@@ -190,7 +190,7 @@ mt76_dma_add_buf(struct mt76_dev *dev, struct mt76_queue *q,
 		next = (q->head + 1) % q->ndesc;
 
 		desc = &q->desc[idx];
-		entry = &q->entry[idx];		
+		entry = &q->entry[idx];
 
 		if (buf[0].skip_unmap)
 			entry->skip_buf0 = true;
@@ -493,7 +493,6 @@ free:
 static int
 mt76_dma_rx_fill(struct mt76_dev *dev, struct mt76_queue *q)
 {
-	
 	int len = SKB_WITH_OVERHEAD(q->buf_size);
 	int frames = 0, offset = q->buf_offset;
 	dma_addr_t addr;

@@ -633,6 +633,7 @@ struct mt76_power_limits {
 	s8 ofdm[8];
 	s8 mcs[4][10];
 	s8 ru[7][12];
+	s8 eht[16][16];
 };
 
 enum mt76_phy_type {

@@ -332,7 +332,8 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 	ieee80211_hw_set(hw, SUPPORTS_CLONED_SKBS);
 	ieee80211_hw_set(hw, SUPPORTS_AMSDU_IN_AMPDU);
 	
-	if (!(dev->drv->drv_flags & MT_DRV_AMSDU_OFFLOAD)) {
+	if (!(dev->drv->drv_flags & MT_DRV_AMSDU_OFFLOAD) &&
+	    hw->max_tx_fragments > 1) {
 		ieee80211_hw_set(hw, TX_AMSDU);
 		ieee80211_hw_set(hw, TX_FRAG_LIST);
 	}

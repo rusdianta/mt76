@@ -65,8 +65,7 @@ mt7603_update_beacon_iter(void *priv, u8 *mac, struct ieee80211_vif *vif)
 		goto out;
 	}
 
-	mt76_tx_queue_skb(dev, dev->mt76.q_tx[MT_TXQ_BEACON],
-			  MT_TXQ_BEACON, skb, &mvif->sta.wcid, NULL);
+	mt76_tx_queue_skb(dev, MT_TXQ_BEACON, skb, &mvif->sta.wcid, NULL);
 
 out:
 	spin_unlock_bh(&dev->ps_lock);
@@ -114,16 +113,16 @@ void mt7603_pre_tbtt_tasklet(unsigned long arg)
 	/* Flush all previous CAB queue packets and beacons */
 	mt76_wr(dev, MT_WF_ARB_CAB_FLUSH, GENMASK(30, 16) | BIT(0));
 
-	mt76_queue_tx_cleanup(dev, dev->mt76.q_tx[MT_TXQ_CAB], false);
-	mt76_queue_tx_cleanup(dev, dev->mt76.q_tx[MT_TXQ_BEACON], false);
+	mt76_queue_tx_cleanup(dev, MT_TXQ_CAB, false);
+	mt76_queue_tx_cleanup(dev, MT_TXQ_BEACON, false);
 
-	if (dev->mt76.q_tx[MT_TXQ_BEACON]->queued > 0)
+	if (dev->mt76.q_tx[MT_TXQ_BEACON]->swq_queued > 0)
 		dev->beacon_check++;
 	else
 		dev->beacon_check = 0;
 	mt7603_mac_stuck_beacon_recovery(dev);
 
-	q = dev->mt76.q_tx[MT_TXQ_BEACON];
+	q = dev->mt76.q_tx[MT_TXQ_BEACON].q;
 	spin_lock(&q->lock);
 	ieee80211_iterate_active_interfaces_atomic(mt76_hw(dev),
 		IEEE80211_IFACE_ITER_RESUME_ALL,

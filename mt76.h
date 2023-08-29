@@ -93,6 +93,10 @@ enum mt76_cipher_type {
 	MT_CIPHER_GCMP_256,
 };
 
+enum mac80211_tx_info_flags_dev {
+	IEEE80211_TX_CTL_HW_80211_ENCAP		= BIT(14),
+};
+
 struct mt76_queue_buf {
 	dma_addr_t addr;
 	u16 len;
@@ -232,6 +236,9 @@ struct mt76_wcid {
 
 	u32 tx_info;
 	bool sw_iv;
+
+	struct list_head tx_list;
+	struct sk_buff_head tx_pending;
 
 	struct list_head list;
 	struct idr pktid;
@@ -466,6 +473,10 @@ struct mt76_rx_status {
 
 struct mt76_dev {
 	struct ieee80211_hw *hw;
+
+	spinlock_t tx_lock;
+	struct list_head tx_list;
+	
 	struct cfg80211_chan_def chandef;
 	struct ieee80211_channel *main_chan;
 

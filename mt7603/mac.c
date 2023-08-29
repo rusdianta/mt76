@@ -1474,7 +1474,7 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
 
 		mt7603_irq_enable(dev, mask);
 
-		clear_bit(MT76_RESET, &dev->mphy.state);
+		clear_bit(MT76_RESET, &dev->mt76.state);
 	}
 
 	mutex_unlock(&dev->mt76.mutex);

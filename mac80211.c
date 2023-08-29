@@ -996,7 +996,7 @@ mt76_sta_add(struct mt76_dev *dev, struct ieee80211_vif *vif,
 	ewma_signal_init(&wcid->rssi);
 	rcu_assign_pointer(dev->wcid[wcid->idx], wcid);
 
-	mt76_packet_id_init(wcid);
+	mt76_wcid_init(wcid);
 out:
 	mutex_unlock(&dev->mutex);
 
@@ -1015,7 +1015,7 @@ void __mt76_sta_remove(struct mt76_dev *dev, struct ieee80211_vif *vif,
 	if (dev->drv->sta_remove)
 		dev->drv->sta_remove(dev, vif, sta);
 
-	mt76_packet_id_flush(dev, wcid);
+	mt76_wcid_cleanup(dev, wcid);
 
 	for (i = 0; i < ARRAY_SIZE(sta->txq); i++)
 		mt76_txq_remove(dev, sta->txq[i]);
@@ -1069,6 +1069,25 @@ void mt76_sta_pre_rcu_remove(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	mutex_unlock(&dev->mutex);
 }
 EXPORT_SYMBOL_GPL(mt76_sta_pre_rcu_remove);
+
+void mt76_wcid_init(struct mt76_wcid *wcid)
+{
+	INIT_LIST_HEAD(&wcid->list);
+	idr_init(&wcid->pktid);
+}
+EXPORT_SYMBOL_GPL(mt76_wcid_init);
+
+void mt76_wcid_cleanup(struct mt76_dev *dev, struct mt76_wcid *wcid)
+{
+	struct sk_buff_head list;
+
+	mt76_tx_status_lock(dev, &list);
+	mt76_tx_status_skb_get(dev, wcid, -1, &list);
+	mt76_tx_status_unlock(dev, &list);
+
+	idr_destroy(&wcid->pktid);
+}
+EXPORT_SYMBOL_GPL(mt76_wcid_cleanup);
 
 int mt76_get_txpower(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		     int *dbm)

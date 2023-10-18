@@ -759,7 +759,6 @@ void mt76_seq_puts_array(struct seq_file *file, const char *str,
 int mt76_eeprom_init(struct mt76_dev *dev, int len);
 void mt76_eeprom_override(struct mt76_dev *dev);
 int mt76_get_of_data_from_mtd(struct mt76_dev *dev, void *eep, int offset, int len);
-int mt76_get_of_eeprom(struct mt76_dev *dev, void *data, int offset, int len);
 
 static inline u8 *
 mt76_get_txwi_ptr(struct mt76_dev *dev, struct mt76_txwi_cache *t)

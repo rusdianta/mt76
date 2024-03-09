@@ -254,7 +254,9 @@ __mt76_tx_queue_skb(struct mt76_dev *dev, int qid, struct sk_buff *skb,
 		return idx;
 
 	wcid = (struct mt76_wcid *)sta->drv_priv;
-	q = dev->q_tx[qid];
+	if (!wcid->sta)
+		return idx;
+
 	q->entry[idx].wcid = wcid->idx;
 
 	if (!non_aql)

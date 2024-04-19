@@ -369,7 +369,8 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 	ieee80211_hw_set(hw, SUPPORTS_CLONED_SKBS);
 	ieee80211_hw_set(hw, SUPPORTS_AMSDU_IN_AMPDU);
 	ieee80211_hw_set(hw, SUPPORTS_REORDERING_BUFFER);
-	
+	ieee80211_hw_set(hw, SPECTRUM_MGMT);
+
 	if (!(dev->drv->drv_flags & MT_DRV_AMSDU_OFFLOAD) &&
 	    hw->max_tx_fragments > 1) {
 		ieee80211_hw_set(hw, TX_AMSDU);

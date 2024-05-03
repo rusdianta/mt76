@@ -118,8 +118,8 @@ enum mt76_cipher_type {
 
 struct mt76_queue_buf {
 	dma_addr_t addr;
-	u16 len;
-	bool skip_unmap;
+	u16 len:15,
+	    skip_unmap:1;
 };
 
 struct mt76_tx_info {

@@ -431,7 +431,8 @@ free:
 }
 
 static int
-mt76_dma_rx_fill(struct mt76_dev *dev, struct mt76_queue *q)
+mt76_dma_rx_fill_buf(struct mt76_dev *dev, struct mt76_queue *q,
+		     bool allow_direct)
 {
 	dma_addr_t addr;
 	void *buf;
@@ -441,8 +442,6 @@ mt76_dma_rx_fill(struct mt76_dev *dev, struct mt76_queue *q)
 
 	if (!q->ndesc)
 		return 0;
-
-	spin_lock_bh(&q->lock);
 
 	while (q->queued < q->ndesc - 1) {
 		struct mt76_queue_buf qbuf;
@@ -467,6 +466,19 @@ mt76_dma_rx_fill(struct mt76_dev *dev, struct mt76_queue *q)
 	if (frames)
 		mt76_dma_kick_queue(dev, q);
 
+	return frames;
+}
+
+int mt76_dma_rx_fill(struct mt76_dev *dev, struct mt76_queue *q,
+		     bool allow_direct)
+{
+	int frames;
+
+	if (!q->ndesc)
+		return 0;
+
+	spin_lock_bh(&q->lock);
+	frames = mt76_dma_rx_fill_buf(dev, q, allow_direct);
 	spin_unlock_bh(&q->lock);
 
 	return frames;
@@ -523,7 +535,7 @@ mt76_dma_rx_reset(struct mt76_dev *dev, enum mt76_rxq_id qid)
 
 	mt76_dma_rx_cleanup(dev, q);
 	mt76_dma_sync_idx(dev, q);
-	mt76_dma_rx_fill(dev, q);
+	mt76_dma_rx_fill_buf(dev, q, false);
 }
 
 static void
@@ -614,7 +626,7 @@ free_frag:
 		skb_free_frag(data);
 	}
 
-	mt76_dma_rx_fill(dev, q);
+	mt76_dma_rx_fill(dev, q, false);
 	return done;
 }
 
@@ -655,7 +667,7 @@ mt76_dma_init(struct mt76_dev *dev,
 
 	mt76_for_each_q_rx(dev, i) {
 		netif_napi_add(&dev->napi_dev, &dev->napi[i], poll, 64);
-		mt76_dma_rx_fill(dev, &dev->q_rx[i]);
+		mt76_dma_rx_fill_buf(dev, &dev->q_rx[i], false);
 		napi_enable(&dev->napi[i]);
 	}
 

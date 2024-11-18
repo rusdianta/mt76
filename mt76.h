@@ -15,11 +15,7 @@
 #include <linux/average.h>
 #include <net/netlink.h>
 #include <net/mac80211.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,6,0)
-#include <net/page_pool.h>
-#else
 #include <net/page_pool/helpers.h>
-#endif
 #include "util.h"
 #include "testmode.h"
 

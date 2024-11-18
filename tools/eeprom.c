@@ -209,7 +209,6 @@ static int
 mt76_eeprom_changes(void)
 {
 	unsigned char *buf;
-	size_t ret;
 	FILE *f;
 	int i;
 
@@ -221,9 +220,7 @@ mt76_eeprom_changes(void)
 
 	buf = malloc(EEPROM_PART_SIZE);
 	fseek(f, mtd_offset, SEEK_SET);
-	ret = fread(buf, 1, EEPROM_PART_SIZE, f);
-	if (ret != EEPROM_PART_SIZE)
-		return EXIT_FAILURE;
+	fread(buf, 1, EEPROM_PART_SIZE, f);
 	for (i = 0; i < EEPROM_PART_SIZE; i++) {
 		if (buf[i] == eeprom_data[i])
 			continue;

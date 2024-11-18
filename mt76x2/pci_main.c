@@ -14,51 +14,43 @@ mt76x2_start(struct ieee80211_hw *hw)
 	mt76x02_mac_start(dev);
 	mt76x2_phy_start(dev);
 
-	ieee80211_queue_delayed_work(mt76_hw(dev), &dev->mt76.mac_work,
+	ieee80211_queue_delayed_work(mt76_hw(dev), &dev->mphy.mac_work,
 				     MT_MAC_WORK_INTERVAL);
 	ieee80211_queue_delayed_work(mt76_hw(dev), &dev->wdt_work,
 				     MT_WATCHDOG_TIME);
 
-	set_bit(MT76_STATE_RUNNING, &dev->mt76.state);
+	set_bit(MT76_STATE_RUNNING, &dev->mphy.state);
 	return 0;
 }
 
 static void
-mt76x2_stop(struct ieee80211_hw *hw)
+mt76x2_stop(struct ieee80211_hw *hw, bool suspend)
 {
 	struct mt76x02_dev *dev = hw->priv;
 
-	clear_bit(MT76_STATE_RUNNING, &dev->mt76.state);
+	clear_bit(MT76_STATE_RUNNING, &dev->mphy.state);
 	mt76x2_stop_hardware(dev);
 }
 
-static void
-mt76x2_set_channel(struct mt76x02_dev *dev, struct cfg80211_chan_def *chandef)
+int mt76x2e_set_channel(struct mt76_phy *phy)
 {
-	cancel_delayed_work_sync(&dev->cal_work);
+	struct mt76x02_dev *dev = container_of(phy->dev, struct mt76x02_dev, mt76);
+
 	tasklet_disable(&dev->mt76.pre_tbtt_tasklet);
 	tasklet_disable(&dev->dfs_pd.dfs_tasklet);
 
-	mutex_lock(&dev->mt76.mutex);
-	set_bit(MT76_RESET, &dev->mt76.state);
-
-	mt76_set_channel(&dev->mt76);
-
 	mt76x2_mac_stop(dev, true);
-	mt76x2_phy_set_channel(dev, chandef);
+	mt76x2_phy_set_channel(dev, &phy->chandef);
 
 	mt76x02_mac_cc_reset(dev);
 	mt76x02_dfs_init_params(dev);
 
 	mt76x2_mac_resume(dev);
 
-	clear_bit(MT76_RESET, &dev->mt76.state);
-	mutex_unlock(&dev->mt76.mutex);
-
 	tasklet_enable(&dev->dfs_pd.dfs_tasklet);
 	tasklet_enable(&dev->mt76.pre_tbtt_tasklet);
 
-	mt76_txq_schedule_all(&dev->mt76);
+	return 0;
 }
 
 static int
@@ -78,24 +70,25 @@ mt76x2_config(struct ieee80211_hw *hw, u32 changed)
 	}
 
 	if (changed & IEEE80211_CONF_CHANGE_POWER) {
-		dev->mt76.txpower_conf = hw->conf.power_level * 2;
+		struct mt76_phy *mphy = &dev->mphy;
 
+		dev->txpower_conf = hw->conf.power_level * 2;
+		dev->txpower_conf = mt76_get_sar_power(mphy,
+						       mphy->chandef.chan,
+						       dev->txpower_conf);
 		/* convert to per-chain power for 2x2 devices */
-		dev->mt76.txpower_conf -= 6;
+		dev->txpower_conf -= 6;
 
-		if (test_bit(MT76_STATE_RUNNING, &dev->mt76.state)) {
+		if (test_bit(MT76_STATE_RUNNING, &dev->mphy.state)) {
 			mt76x2_phy_set_txpower(dev);
-			mt76x02_tx_set_txpwr_auto(dev, dev->mt76.txpower_conf);
+			mt76x02_tx_set_txpwr_auto(dev, dev->txpower_conf);
 		}
 	}
 
 	mutex_unlock(&dev->mt76.mutex);
 
-	if (changed & IEEE80211_CONF_CHANGE_CHANNEL) {
-		ieee80211_stop_queues(hw);
-		mt76x2_set_channel(dev, &hw->conf.chandef);
-		ieee80211_wake_queues(hw);
-	}
+	if (changed & IEEE80211_CONF_CHANGE_CHANNEL)
+		mt76_update_channel(&dev->mphy);
 
 	return 0;
 }
@@ -116,10 +109,10 @@ static int mt76x2_set_antenna(struct ieee80211_hw *hw, u32 tx_ant,
 
 	mutex_lock(&dev->mt76.mutex);
 
-	dev->mt76.chainmask = (tx_ant == 3) ? 0x202 : 0x101;
-	dev->mt76.antenna_mask = tx_ant;
+	dev->mphy.chainmask = (tx_ant == 3) ? 0x202 : 0x101;
+	dev->mphy.antenna_mask = tx_ant;
 
-	mt76_set_stream_caps(&dev->mt76, true);
+	mt76_set_stream_caps(&dev->mphy, true);
 	mt76x2_phy_set_antenna(dev);
 
 	mutex_unlock(&dev->mt76.mutex);
@@ -128,6 +121,10 @@ static int mt76x2_set_antenna(struct ieee80211_hw *hw, u32 tx_ant,
 }
 
 const struct ieee80211_ops mt76x2_ops = {
+	.add_chanctx = ieee80211_emulate_add_chanctx,
+	.remove_chanctx = ieee80211_emulate_remove_chanctx,
+	.change_chanctx = ieee80211_emulate_change_chanctx,
+	.switch_vif_chanctx = ieee80211_emulate_switch_vif_chanctx,
 	.tx = mt76x02_tx,
 	.start = mt76x2_start,
 	.stop = mt76x2_stop,
@@ -155,5 +152,6 @@ const struct ieee80211_ops mt76x2_ops = {
 	.get_antenna = mt76_get_antenna,
 	.set_rts_threshold = mt76x02_set_rts_threshold,
 	.reconfig_complete = mt76x02_reconfig_complete,
+	.set_sar_specs = mt76x2_set_sar_specs,
 };
 

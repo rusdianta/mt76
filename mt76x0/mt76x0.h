@@ -1,16 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (C) 2014 Felix Fietkau <nbd@openwrt.org>
  * Copyright (C) 2015 Jakub Kicinski <kubakici@wp.pl>
  * Copyright (C) 2018 Stanislaw Gruszka <stf_xl@wp.pl>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2
- * as published by the Free Software Foundation
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #ifndef MT76X0U_H
@@ -57,6 +49,9 @@ void mt76x0_chip_onoff(struct mt76x02_dev *dev, bool enable, bool reset);
 void mt76x0_mac_stop(struct mt76x02_dev *dev);
 
 int mt76x0_config(struct ieee80211_hw *hw, u32 changed);
+int mt76x0_set_channel(struct mt76_phy *mphy);
+int mt76x0_set_sar_specs(struct ieee80211_hw *hw,
+			 const struct cfg80211_sar_specs *sar);
 
 /* PHY */
 void mt76x0_phy_init(struct mt76x02_dev *dev);

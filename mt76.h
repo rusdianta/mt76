@@ -15,7 +15,6 @@
 #include <linux/average.h>
 #include <net/netlink.h>
 #include <net/mac80211.h>
-#include <net/page_pool/helpers.h>
 #include "util.h"
 #include "testmode.h"
 

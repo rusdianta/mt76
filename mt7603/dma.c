@@ -11,20 +11,6 @@ static const u8 wmm_queue_map[] = {
 	[IEEE80211_AC_VO] = 3,
 };
 
-/**
- * ieee80211_is_bufferable_mmpdu - check if frame is bufferable MMPDU
- * @fc: frame control field in little-endian byteorder
- */
-static inline bool ieee80211_is_bufferable_mmpdu(__le16 fc)
-{
-      /* IEEE 802.11-2012, definition of "bufferable management frame";
-       * note that this ignores the IBSS special case. */
-      return ieee80211_is_mgmt(fc) &&
-             (ieee80211_is_action(fc) ||
-              ieee80211_is_disassoc(fc) ||
-              ieee80211_is_deauth(fc));
-}
-
 static int
 mt7603_init_tx_queue(struct mt7603_dev *dev, struct mt76_sw_queue *q,
 		     int idx, int n_desc)

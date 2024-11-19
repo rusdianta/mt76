@@ -12,40 +12,40 @@ static const u8 wmm_queue_map[] = {
 };
 
 /* Action category code */
-enum ieee80211_category {
-	WLAN_CATEGORY_SPECTRUM_MGMT = 0,
-	WLAN_CATEGORY_QOS = 1,
-	WLAN_CATEGORY_DLS = 2,
-	WLAN_CATEGORY_BACK = 3,
-	WLAN_CATEGORY_PUBLIC = 4,
-	WLAN_CATEGORY_RADIO_MEASUREMENT = 5,
-	WLAN_CATEGORY_FAST_BBS_TRANSITION = 6,
-	WLAN_CATEGORY_HT = 7,
-	WLAN_CATEGORY_SA_QUERY = 8,
-	WLAN_CATEGORY_PROTECTED_DUAL_OF_ACTION = 9,
-	WLAN_CATEGORY_WNM = 10,
-	WLAN_CATEGORY_WNM_UNPROTECTED = 11,
-	WLAN_CATEGORY_TDLS = 12,
-	WLAN_CATEGORY_MESH_ACTION = 13,
-	WLAN_CATEGORY_MULTIHOP_ACTION = 14,
-	WLAN_CATEGORY_SELF_PROTECTED = 15,
-	WLAN_CATEGORY_DMG = 16,
-	WLAN_CATEGORY_WMM = 17,
-	WLAN_CATEGORY_FST = 18,
-	WLAN_CATEGORY_UNPROT_DMG = 20,
-	WLAN_CATEGORY_VHT = 21,
-	WLAN_CATEGORY_S1G = 22,
-	WLAN_CATEGORY_PROTECTED_EHT = 37,
-	WLAN_CATEGORY_VENDOR_SPECIFIC_PROTECTED = 126,
-	WLAN_CATEGORY_VENDOR_SPECIFIC = 127,
-};
+// enum ieee80211_category {
+// 	WLAN_CATEGORY_SPECTRUM_MGMT = 0,
+// 	WLAN_CATEGORY_QOS = 1,
+// 	WLAN_CATEGORY_DLS = 2,
+// 	WLAN_CATEGORY_BACK = 3,
+// 	WLAN_CATEGORY_PUBLIC = 4,
+// 	WLAN_CATEGORY_RADIO_MEASUREMENT = 5,
+// 	WLAN_CATEGORY_FAST_BBS_TRANSITION = 6,
+// 	WLAN_CATEGORY_HT = 7,
+// 	WLAN_CATEGORY_SA_QUERY = 8,
+// 	WLAN_CATEGORY_PROTECTED_DUAL_OF_ACTION = 9,
+// 	WLAN_CATEGORY_WNM = 10,
+// 	WLAN_CATEGORY_WNM_UNPROTECTED = 11,
+// 	WLAN_CATEGORY_TDLS = 12,
+// 	WLAN_CATEGORY_MESH_ACTION = 13,
+// 	WLAN_CATEGORY_MULTIHOP_ACTION = 14,
+// 	WLAN_CATEGORY_SELF_PROTECTED = 15,
+// 	WLAN_CATEGORY_DMG = 16,
+// 	WLAN_CATEGORY_WMM = 17,
+// 	WLAN_CATEGORY_FST = 18,
+// 	WLAN_CATEGORY_UNPROT_DMG = 20,
+// 	WLAN_CATEGORY_VHT = 21,
+// 	WLAN_CATEGORY_S1G = 22,
+// 	WLAN_CATEGORY_PROTECTED_EHT = 37,
+// 	WLAN_CATEGORY_VENDOR_SPECIFIC_PROTECTED = 126,
+// 	WLAN_CATEGORY_VENDOR_SPECIFIC = 127,
+// };
 
 /**
  * ieee80211_is_bufferable_mmpdu - check if frame is bufferable MMPDU
  * @skb: the skb to check, starting with the 802.11 header
  * Return: whether or not the MMPDU is bufferable
  */
-static inline bool ieee80211_is_bufferable_mmpdu(struct sk_buff *skb)
+static inline bool ieee80211_is_bufferable_mmpdu_v2(struct sk_buff *skb)
 {
 	struct ieee80211_mgmt *mgmt = (void *)skb->data;
 	__le16 fc = mgmt->frame_control;
@@ -156,7 +156,7 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
 		hwq = wmm_queue_map[IEEE80211_AC_BE];
 	} else {
 		skb_pull(skb, MT_TXD_SIZE);
-		if (!ieee80211_is_bufferable_mmpdu(skb))
+		if (!ieee80211_is_bufferable_mmpdu_v2(skb))
 			goto free;
 		skb_push(skb, MT_TXD_SIZE);
 		skb_set_queue_mapping(skb, MT_TXQ_PSD);

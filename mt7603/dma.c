@@ -11,6 +11,74 @@ static const u8 wmm_queue_map[] = {
 	[IEEE80211_AC_VO] = 3,
 };
 
+/* Action category code */
+enum ieee80211_category {
+	WLAN_CATEGORY_SPECTRUM_MGMT = 0,
+	WLAN_CATEGORY_QOS = 1,
+	WLAN_CATEGORY_DLS = 2,
+	WLAN_CATEGORY_BACK = 3,
+	WLAN_CATEGORY_PUBLIC = 4,
+	WLAN_CATEGORY_RADIO_MEASUREMENT = 5,
+	WLAN_CATEGORY_FAST_BBS_TRANSITION = 6,
+	WLAN_CATEGORY_HT = 7,
+	WLAN_CATEGORY_SA_QUERY = 8,
+	WLAN_CATEGORY_PROTECTED_DUAL_OF_ACTION = 9,
+	WLAN_CATEGORY_WNM = 10,
+	WLAN_CATEGORY_WNM_UNPROTECTED = 11,
+	WLAN_CATEGORY_TDLS = 12,
+	WLAN_CATEGORY_MESH_ACTION = 13,
+	WLAN_CATEGORY_MULTIHOP_ACTION = 14,
+	WLAN_CATEGORY_SELF_PROTECTED = 15,
+	WLAN_CATEGORY_DMG = 16,
+	WLAN_CATEGORY_WMM = 17,
+	WLAN_CATEGORY_FST = 18,
+	WLAN_CATEGORY_UNPROT_DMG = 20,
+	WLAN_CATEGORY_VHT = 21,
+	WLAN_CATEGORY_S1G = 22,
+	WLAN_CATEGORY_PROTECTED_EHT = 37,
+	WLAN_CATEGORY_VENDOR_SPECIFIC_PROTECTED = 126,
+	WLAN_CATEGORY_VENDOR_SPECIFIC = 127,
+};
+
+/**
+ * ieee80211_is_bufferable_mmpdu - check if frame is bufferable MMPDU
+ * @skb: the skb to check, starting with the 802.11 header
+ * Return: whether or not the MMPDU is bufferable
+ */
+static inline bool ieee80211_is_bufferable_mmpdu(struct sk_buff *skb)
+{
+	struct ieee80211_mgmt *mgmt = (void *)skb->data;
+	__le16 fc = mgmt->frame_control;
+
+	/*
+	 * IEEE 802.11 REVme D2.0 definition of bufferable MMPDU;
+	 * note that this ignores the IBSS special case.
+	 */
+	if (!ieee80211_is_mgmt(fc))
+		return false;
+
+	if (ieee80211_is_disassoc(fc) || ieee80211_is_deauth(fc))
+		return true;
+
+	if (!ieee80211_is_action(fc))
+		return false;
+
+	if (skb->len < offsetofend(typeof(*mgmt), u.action.u.ftm.action_code))
+		return true;
+
+	/* action frame - additionally check for non-bufferable FTM */
+
+	if (mgmt->u.action.category != WLAN_CATEGORY_PUBLIC &&
+	    mgmt->u.action.category != WLAN_CATEGORY_PROTECTED_DUAL_OF_ACTION)
+		return true;
+
+	if (mgmt->u.action.u.ftm.action_code == WLAN_PUB_ACTION_FTM_REQUEST ||
+	    mgmt->u.action.u.ftm.action_code == WLAN_PUB_ACTION_FTM_RESPONSE)
+		return false;
+
+	return true;
+}
+
 static int
 mt7603_init_tx_queue(struct mt7603_dev *dev, struct mt76_sw_queue *q,
 		     int idx, int n_desc)

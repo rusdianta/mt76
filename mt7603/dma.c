@@ -11,113 +11,6 @@ static const u8 wmm_queue_map[] = {
 	[IEEE80211_AC_VO] = 3,
 };
 
-/* Action category code */
-enum ieee80211_category_v2 {
-	//WLAN_CATEGORY_SPECTRUM_MGMT = 0,
-	//WLAN_CATEGORY_QOS = 1,
-	//WLAN_CATEGORY_DLS = 2,
-	//WLAN_CATEGORY_BACK = 3,
-	WLAN_CAT_PUBLIC = 4,
-	//WLAN_CATEGORY_RADIO_MEASUREMENT = 5,
-	//WLAN_CATEGORY_FAST_BBS_TRANSITION = 6,
-	//WLAN_CATEGORY_HT = 7,
-	//WLAN_CATEGORY_SA_QUERY = 8,
-	WLAN_CAT_PROTECTED_DUAL_OF_ACTION = 9,
-	//WLAN_CATEGORY_WNM = 10,
-	//WLAN_CATEGORY_WNM_UNPROTECTED = 11,
-	//WLAN_CATEGORY_TDLS = 12,
-	//WLAN_CATEGORY_MESH_ACTION = 13,
-	//WLAN_CATEGORY_MULTIHOP_ACTION = 14,
-	//WLAN_CATEGORY_SELF_PROTECTED = 15,
-	//WLAN_CATEGORY_DMG = 16,
-	//WLAN_CATEGORY_WMM = 17,
-	//WLAN_CATEGORY_FST = 18,
-	//WLAN_CATEGORY_UNPROT_DMG = 20,
-	//WLAN_CATEGORY_VHT = 21,
-	//WLAN_CATEGORY_S1G = 22,
-	//WLAN_CATEGORY_PROTECTED_EHT = 37,
-	//WLAN_CATEGORY_VENDOR_SPECIFIC_PROTECTED = 126,
-	//WLAN_CATEGORY_VENDOR_SPECIFIC = 127,
-};
-
-/* Public action codes (IEEE Std 802.11-2016, 9.6.8.1, Table 9-307) */
-enum ieee80211_pub_actioncode_v2 {
-	// WLAN_PUB_ACTION_20_40_BSS_COEX = 0,
-	// WLAN_PUB_ACTION_DSE_ENABLEMENT = 1,
-	// WLAN_PUB_ACTION_DSE_DEENABLEMENT = 2,
-	// WLAN_PUB_ACTION_DSE_REG_LOC_ANN = 3,
-	// WLAN_PUB_ACTION_EXT_CHANSW_ANN = 4,
-	// WLAN_PUB_ACTION_DSE_MSMT_REQ = 5,
-	// WLAN_PUB_ACTION_DSE_MSMT_RESP = 6,
-	// WLAN_PUB_ACTION_MSMT_PILOT = 7,
-	// WLAN_PUB_ACTION_DSE_PC = 8,
-	// WLAN_PUB_ACTION_VENDOR_SPECIFIC = 9,
-	// WLAN_PUB_ACTION_GAS_INITIAL_REQ = 10,
-	// WLAN_PUB_ACTION_GAS_INITIAL_RESP = 11,
-	// WLAN_PUB_ACTION_GAS_COMEBACK_REQ = 12,
-	// WLAN_PUB_ACTION_GAS_COMEBACK_RESP = 13,
-	// WLAN_PUB_ACTION_TDLS_DISCOVER_RES = 14,
-	// WLAN_PUB_ACTION_LOC_TRACK_NOTI = 15,
-	// WLAN_PUB_ACTION_QAB_REQUEST_FRAME = 16,
-	// WLAN_PUB_ACTION_QAB_RESPONSE_FRAME = 17,
-	// WLAN_PUB_ACTION_QMF_POLICY = 18,
-	// WLAN_PUB_ACTION_QMF_POLICY_CHANGE = 19,
-	// WLAN_PUB_ACTION_QLOAD_REQUEST = 20,
-	// WLAN_PUB_ACTION_QLOAD_REPORT = 21,
-	// WLAN_PUB_ACTION_HCCA_TXOP_ADVERT = 22,
-	// WLAN_PUB_ACTION_HCCA_TXOP_RESPONSE = 23,
-	// WLAN_PUB_ACTION_PUBLIC_KEY = 24,
-	// WLAN_PUB_ACTION_CHANNEL_AVAIL_QUERY = 25,
-	// WLAN_PUB_ACTION_CHANNEL_SCHEDULE_MGMT = 26,
-	// WLAN_PUB_ACTION_CONTACT_VERI_SIGNAL = 27,
-	// WLAN_PUB_ACTION_GDD_ENABLEMENT_REQ = 28,
-	// WLAN_PUB_ACTION_GDD_ENABLEMENT_RESP = 29,
-	// WLAN_PUB_ACTION_NETWORK_CHANNEL_CONTROL = 30,
-	// WLAN_PUB_ACTION_WHITE_SPACE_MAP_ANN = 31,
-	WLAN_PUB_ACT_FTM_REQUEST = 32,
-	WLAN_PUB_ACT_FTM_RESPONSE = 33,
-	//WLAN_PUB_ACTION_FILS_DISCOVERY = 34,
-};
-
-/**
- * ieee80211_is_bufferable_mmpdu - check if frame is bufferable MMPDU
- * @skb: the skb to check, starting with the 802.11 header
- * Return: whether or not the MMPDU is bufferable
- */
-static inline bool ieee80211_is_bufferable_mmpdu_v2(struct sk_buff *skb)
-{
-	struct ieee80211_mgmt *mgmt = (void *)skb->data;
-	__le16 fc = mgmt->frame_control;
-
-	/*
-	 * IEEE 802.11 REVme D2.0 definition of bufferable MMPDU;
-	 * note that this ignores the IBSS special case.
-	 */
-	if (!ieee80211_is_mgmt(fc))
-		return false;
-
-	if (ieee80211_is_disassoc(fc) || ieee80211_is_deauth(fc))
-		return true;
-
-	if (!ieee80211_is_action(fc))
-		return false;
-
-	if (skb->len < offsetofend(typeof(*mgmt), u.action.u.ftm.action_code))
-		return true;
-
-	/* action frame - additionally check for non-bufferable FTM */
-
-	if (mgmt->u.action.category != WLAN_CAT_PUBLIC &&
-	    mgmt->u.action.category != WLAN_CAT_PROTECTED_DUAL_OF_ACTION)
-		return true;
-
-	if (mgmt->u.action.u.ftm.action_code == WLAN_PUB_ACT_FTM_REQUEST ||
-	    mgmt->u.action.u.ftm.action_code == WLAN_PUB_ACT_FTM_RESPONSE)
-		return false;
-
-	return true;
-}
-
 static int
 mt7603_init_tx_queue(struct mt7603_dev *dev, struct mt76_sw_queue *q,
 		     int idx, int n_desc)
@@ -154,6 +47,7 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
 		IEEE80211_AC_VO,
 		IEEE80211_AC_VO
 	};
+	__le16 fc;
 	__le32 *txd = (__le32 *)skb->data;
 	struct ieee80211_hdr *hdr;
 	struct ieee80211_sta *sta;
@@ -182,20 +76,21 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
 
 	sta = container_of(priv, struct ieee80211_sta, drv_priv);
 	hdr = (struct ieee80211_hdr *)&skb->data[MT_TXD_SIZE];
+	fc = hdr->frame_control;
 
 	hwq = wmm_queue_map[IEEE80211_AC_BE];
-	if (ieee80211_is_data_qos(hdr->frame_control)) {
+	if (ieee80211_is_data_qos(fc)) {
 		tid = *ieee80211_get_qos_ctl(hdr) &
 		      IEEE80211_QOS_CTL_TAG1D_MASK;
 		qid = tid_to_ac[tid];
 		hwq = wmm_queue_map[qid];
 		skb_set_queue_mapping(skb, qid);
-	} else if (ieee80211_is_data(hdr->frame_control)) {
+	} else if (ieee80211_is_data(fc)) {
 		skb_set_queue_mapping(skb, IEEE80211_AC_BE);
 		hwq = wmm_queue_map[IEEE80211_AC_BE];
 	} else {
 		skb_pull(skb, MT_TXD_SIZE);
-		if (!ieee80211_is_bufferable_mmpdu_v2(skb))
+		if (!ieee80211_is_bufferable_mmpdu(fc))
 			goto free;
 		skb_push(skb, MT_TXD_SIZE);
 		skb_set_queue_mapping(skb, MT_TXQ_PSD);

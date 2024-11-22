@@ -200,9 +200,10 @@ void mt7603_filter_tx(struct mt7603_dev *dev, int idx, bool abort)
 			FIELD_PREP(MT_DMA_FQCR0_DEST_PORT_ID, port) |
 			FIELD_PREP(MT_DMA_FQCR0_DEST_QUEUE_ID, queue));
 
-		WARN_ON_ONCE(!mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY,
-					0, 5000));
+		mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY, 0, 15000);
 	}
+
+	WARN_ON_ONCE(mt76_rr(dev, MT_DMA_FQCR0) & MT_DMA_FQCR0_BUSY);
 
 	mt76_wr(dev, MT_TX_ABORT, 0);
 
@@ -1199,7 +1200,7 @@ mt7603_mac_add_txs_skb(struct mt7603_dev *dev, struct mt7603_sta *sta, int pid,
 		struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 
 		if (!mt7603_fill_txs(dev, sta, info, txs_data)) {
-			ieee80211_tx_info_clear_status(info);
+			info->status.rates[0].count = 0;
 			info->status.rates[0].idx = -1;
 		}
 

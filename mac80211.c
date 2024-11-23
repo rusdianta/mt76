@@ -610,10 +610,6 @@ static struct ieee80211_sta *mt76_rx_convert(struct sk_buff *skb)
 	if (status->signal <= -128)
 		status->flag |= RX_FLAG_NO_SIGNAL_VAL;
 
-	if (ieee80211_is_beacon(hdr->frame_control) ||
-	    ieee80211_is_probe_resp(hdr->frame_control))
-			status->boottime_ns = ktime_get_boottime_ns();
-
 	BUILD_BUG_ON(sizeof(mstat) > sizeof(skb->cb));
 	BUILD_BUG_ON(sizeof(status->chain_signal) !=
 		     sizeof(mstat.chain_signal));

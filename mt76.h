@@ -19,7 +19,7 @@
 #define MT_TX_RING_SIZE     256
 #define MT_MCU_RING_SIZE    32
 #define MT_RX_BUF_SIZE      2048
-#define MT_SKB_HEAD_LEN     128
+#define MT_SKB_HEAD_LEN     256
 
 struct mt76_dev;
 struct mt76_wcid;
@@ -404,7 +404,6 @@ struct mt76_usb {
 		struct mt76_reg_pair *rp;
 		int rp_len;
 		u32 base;
-		bool burst;
 	} mcu;
 };
 

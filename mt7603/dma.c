@@ -11,6 +11,58 @@ static const u8 wmm_queue_map[] = {
 	[IEEE80211_AC_VO] = 3,
 };
 
+/* Action category code */
+enum ieee80211_category_lk64 {
+	WLAN_CAT_PUBLIC = 4,
+	WLAN_CAT_PROTECTED_DUAL_OF_ACTION = 9,
+};
+
+/* Public action codes (IEEE Std 802.11-2016, 9.6.8.1, Table 9-307) */
+enum ieee80211_pub_actioncode_lk64 {
+	WLAN_PUB_ACT_FTM_REQUEST = 32,
+	WLAN_PUB_ACT_FTM_RESPONSE = 33,
+};
+
+
+/**
+ * ieee80211_is_bufferable_mmpdu - check if frame is bufferable MMPDU
+ * @skb: the skb to check, starting with the 802.11 header
+ * Return: whether or not the MMPDU is bufferable
+ */
+static inline bool ieee80211_is_bufferable_mmpdu_lk64(struct sk_buff *skb)
+{
+	struct ieee80211_mgmt *mgmt = (void *)skb->data;
+	__le16 fc = mgmt->frame_control;
+
+	/*
+	 * IEEE 802.11 REVme D2.0 definition of bufferable MMPDU;
+	 * note that this ignores the IBSS special case.
+	 */
+	if (!ieee80211_is_mgmt(fc))
+		return false;
+
+	if (ieee80211_is_disassoc(fc) || ieee80211_is_deauth(fc))
+		return true;
+
+	if (!ieee80211_is_action(fc))
+		return false;
+
+	if (skb->len < offsetofend(typeof(*mgmt), u.action.u.ftm.action_code))
+		return true;
+
+	/* action frame - additionally check for non-bufferable FTM */
+
+	if (mgmt->u.action.category != WLAN_CAT_PUBLIC &&
+	    mgmt->u.action.category != WLAN_CAT_PROTECTED_DUAL_OF_ACTION)
+		return true;
+
+	if (mgmt->u.action.u.ftm.action_code == WLAN_PUB_ACT_FTM_REQUEST ||
+	    mgmt->u.action.u.ftm.action_code == WLAN_PUB_ACT_FTM_RESPONSE)
+		return false;
+
+	return true;
+}
+
 static int
 mt7603_init_tx_queue(struct mt7603_dev *dev, struct mt76_sw_queue *q,
 		     int idx, int n_desc)
@@ -90,7 +142,7 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
 		hwq = wmm_queue_map[IEEE80211_AC_BE];
 	} else {
 		skb_pull(skb, MT_TXD_SIZE);
-		if (!ieee80211_is_bufferable_mmpdu(fc))
+		if (!ieee80211_is_bufferable_mmpdu(skb))
 			goto free;
 		skb_push(skb, MT_TXD_SIZE);
 		skb_set_queue_mapping(skb, MT_TXQ_PSD);
@@ -125,7 +177,7 @@ void mt7603_queue_rx_skb(struct mt76_dev *mdev, enum mt76_rxq_id q,
 	__le32 *end = (__le32 *)&skb->data[skb->len];
 	enum rx_pkt_type type;
 
-	type = FIELD_GET(MT_RXD0_PKT_TYPE, le32_to_cpu(rxd[0]));
+	type = le32_get_bits(rxd[0], MT_RXD0_PKT_TYPE);
 
 	if (q == MT_RXQ_MCU) {
 		if (type == PKT_TYPE_RX_EVENT)

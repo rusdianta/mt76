@@ -606,7 +606,6 @@ static struct ieee80211_sta *mt76_rx_convert(struct sk_buff *skb)
 	status->signal = mstat.signal;
 	status->chains = mstat.chains;
 	status->ampdu_reference = mstat.ampdu_ref;
-	status->mactime = mstat.timestamp;
 	status->signal = mt76_rx_signal(&mstat);
 	if (status->signal <= -128)
 		status->flag |= RX_FLAG_NO_SIGNAL_VAL;
@@ -651,16 +650,6 @@ mt76_check_ccmp_pn(struct sk_buff *skb)
 		    !ieee80211_is_first_frag(hdr->frame_control))
 			return 0;
 	}
-
-	/* IEEE 802.11-2020, 12.5.3.4.4 "PN and replay detection" c):
-	 *
-	 * the recipient shall maintain a single replay counter for received
-	 * individually addressed robust Management frames that are received
-	 * with the To DS subfield equal to 0, [...]
-	 */
-	if (ieee80211_is_mgmt(hdr->frame_control) &&
-	    !ieee80211_has_tods(hdr->frame_control))
-		security_idx = IEEE80211_NUM_TIDS;
 
 	BUILD_BUG_ON(sizeof(status->iv) != sizeof(wcid->rx_key_pn[0]));
 	ret = memcmp(status->iv, wcid->rx_key_pn[status->tid],

@@ -19,6 +19,10 @@
 	.max_power = 30,			\
 }
 
+enum mac80211_rx_flags {
+	RX_FLAG_8023			= BIT(30),
+};
+
 static const struct ieee80211_channel mt76_channels_2ghz[] = {
 	CHAN2G(1, 2412),
 	CHAN2G(2, 2417),

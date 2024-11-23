@@ -19,10 +19,6 @@
 	.max_power = 30,			\
 }
 
-enum mac80211_rx_flags {
-	RX_FLAG_8023			= BIT(30),
-};
-
 static const struct ieee80211_channel mt76_channels_2ghz[] = {
 	CHAN2G(1, 2412),
 	CHAN2G(2, 2417),
@@ -604,16 +600,12 @@ static struct ieee80211_sta *mt76_rx_convert(struct sk_buff *skb)
 	status->enc_flags = mstat.enc_flags;
 	status->encoding = mstat.encoding;
 	status->bw = mstat.bw;
-	status->he_ru = mstat.he_ru;
-	status->he_gi = mstat.he_gi;
-	status->he_dcm = mstat.he_dcm;
 	status->rate_idx = mstat.rate_idx;
 	status->nss = mstat.nss;
 	status->band = mstat.band;
 	status->signal = mstat.signal;
 	status->chains = mstat.chains;
 	status->ampdu_reference = mstat.ampdu_ref;
-	status->device_timestamp = mstat.timestamp;
 	status->mactime = mstat.timestamp;
 	status->signal = mt76_rx_signal(&mstat);
 	if (status->signal <= -128)

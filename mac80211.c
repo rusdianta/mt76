@@ -624,7 +624,7 @@ static struct ieee80211_sta *mt76_rx_convert(struct sk_buff *skb)
 	return wcid_to_sta(mstat.wcid);
 }
 
-static void
+static int
 mt76_check_ccmp_pn(struct sk_buff *skb)
 {
 	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
@@ -633,13 +633,13 @@ mt76_check_ccmp_pn(struct sk_buff *skb)
 	int ret;
 
 	if (!(status->flag & RX_FLAG_DECRYPTED))
-		return;
+		return 0;
 
 	if (status->flag & RX_FLAG_ONLY_MONITOR)
-		return;
+		return 0;
 
 	if (!wcid || !wcid->rx_check_pn)
-		return;
+		return 0;
 
 	if (!(status->flag & RX_FLAG_IV_STRIPPED)) {
 		/*
@@ -649,7 +649,7 @@ mt76_check_ccmp_pn(struct sk_buff *skb)
 		hdr = (struct ieee80211_hdr *)skb->data;
 		if (ieee80211_is_frag(hdr) &&
 		    !ieee80211_is_first_frag(hdr->frame_control))
-			return;
+			return 0;
 	}
 
 	/* IEEE 802.11-2020, 12.5.3.4.4 "PN and replay detection" c):
@@ -662,19 +662,18 @@ mt76_check_ccmp_pn(struct sk_buff *skb)
 	    !ieee80211_has_tods(hdr->frame_control))
 		security_idx = IEEE80211_NUM_TIDS;
 
-skip_hdr_check:
 	BUILD_BUG_ON(sizeof(status->iv) != sizeof(wcid->rx_key_pn[0]));
 	ret = memcmp(status->iv, wcid->rx_key_pn[status->tid],
 		     sizeof(status->iv));
-	if (ret <= 0) {
-		status->flag |= RX_FLAG_ONLY_MONITOR;
-		return;
-	}
+	if (ret <= 0)
+		return -EINVAL; /* replay */
 
 	memcpy(wcid->rx_key_pn[status->tid], status->iv, sizeof(status->iv));
 
 	if (status->flag & RX_FLAG_IV_STRIPPED)
 		status->flag |= RX_FLAG_PN_VALIDATED;
+
+	return 0;
 }
 
 static void
@@ -835,34 +834,18 @@ void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
 {
 	struct ieee80211_sta *sta;
 	struct sk_buff *skb;
-	struct sk_buff *skb, *tmp;
-	LIST_HEAD(list);
 
 	spin_lock(&dev->rx_lock);
 	while ((skb = __skb_dequeue(frames)) != NULL) {
-		struct sk_buff *nskb = skb_shinfo(skb)->frag_list;
-
-		mt76_check_ccmp_pn(skb);
-		skb_shinfo(skb)->frag_list = NULL;
-		mt76_rx_convert(dev, skb, &hw, &sta);
-		ieee80211_rx_list(hw, sta, skb, &list);
-
-		/* subsequent amsdu frames */
-		while (nskb) {
-			skb = nskb;
-			nskb = nskb->next;
-			skb->next = NULL;
-
-			mt76_rx_convert(dev, skb, &hw, &sta);
-			ieee80211_rx_list(hw, sta, skb, &list);
+		if (mt76_check_ccmp_pn(skb)) {
+			dev_kfree_skb(skb);
+			continue;
 		}
+
+		sta = mt76_rx_convert(skb);
+		ieee80211_rx_napi(dev->hw, sta, skb, napi);
 	}
 	spin_unlock(&dev->rx_lock);
-
-	list_for_each_entry_safe(skb, tmp, &list, list) {
-		skb_list_del_init(skb);
-		napi_gro_receive(napi, skb);
-	}
 }
 
 void mt76_rx_poll_complete(struct mt76_dev *dev, enum mt76_rxq_id q,

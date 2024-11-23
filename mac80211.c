@@ -589,7 +589,6 @@ mt76_rx_signal(struct mt76_rx_status *status)
 static struct ieee80211_sta *mt76_rx_convert(struct sk_buff *skb)
 {
 	struct ieee80211_rx_status *status = IEEE80211_SKB_RXCB(skb);
-	struct ieee80211_hdr *hdr = mt76_skb_get_hdr(skb);
 	struct mt76_rx_status mstat;
 
 	mstat = *((struct mt76_rx_status *)skb->cb);

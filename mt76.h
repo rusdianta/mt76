@@ -843,23 +843,4 @@ struct sk_buff *mt76_mcu_get_response(struct mt76_dev *dev,
 
 void mt76_set_irq_mask(struct mt76_dev *dev, u32 addr, u32 clear, u32 set);
 
-static inline void *mt76_skb_get_hdr(struct sk_buff *skb)
-{
-	struct mt76_rx_status mstat;
-	u8 *data = skb->data;
-
-	/* Alignment concerns */
-	BUILD_BUG_ON(sizeof(struct ieee80211_radiotap_he) % 4);
-	BUILD_BUG_ON(sizeof(struct ieee80211_radiotap_he_mu) % 4);
-
-	mstat = *((struct mt76_rx_status *)skb->cb);
-
-	if (mstat.flag & RX_FLAG_RADIOTAP_HE)
-		data += sizeof(struct ieee80211_radiotap_he);
-	if (mstat.flag & RX_FLAG_RADIOTAP_HE_MU)
-		data += sizeof(struct ieee80211_radiotap_he_mu);
-
-	return data;
-}
-
 #endif

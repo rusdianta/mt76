@@ -142,7 +142,7 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
 		hwq = wmm_queue_map[IEEE80211_AC_BE];
 	} else {
 		skb_pull(skb, MT_TXD_SIZE);
-		if (!ieee80211_is_bufferable_mmpdu(skb))
+		if (!ieee80211_is_bufferable_mmpdu_lk64(skb))
 			goto free;
 		skb_push(skb, MT_TXD_SIZE);
 		skb_set_queue_mapping(skb, MT_TXQ_PSD);

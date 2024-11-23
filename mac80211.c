@@ -859,11 +859,6 @@ void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
 	}
 	spin_unlock(&dev->rx_lock);
 
-	if (!napi) {
-		netif_receive_skb_list(&list);
-		return;
-	}
-
 	list_for_each_entry_safe(skb, tmp, &list, list) {
 		skb_list_del_init(skb);
 		napi_gro_receive(napi, skb);
@@ -981,9 +976,7 @@ void mt76_sta_pre_rcu_remove(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	struct mt76_wcid *wcid = (struct mt76_wcid *)sta->drv_priv;
 
 	mutex_lock(&dev->mutex);
-	spin_lock_bh(&dev->status_lock);
 	rcu_assign_pointer(dev->wcid[wcid->idx], NULL);
-	spin_unlock_bh(&dev->status_lock);
 	mutex_unlock(&dev->mutex);
 }
 EXPORT_SYMBOL_GPL(mt76_sta_pre_rcu_remove);
@@ -1020,7 +1013,7 @@ EXPORT_SYMBOL_GPL(mt76_get_txpower);
 static void
 __mt76_csa_finish(void *priv, u8 *mac, struct ieee80211_vif *vif)
 {
-	if (vif->csa_active && ieee80211_beacon_cntdwn_is_complete(vif))
+	if (vif->csa_active && ieee80211_csa_is_complete(vif))
 		ieee80211_csa_finish(vif);
 }
 
@@ -1045,7 +1038,7 @@ __mt76_csa_check(void *priv, u8 *mac, struct ieee80211_vif *vif)
 	if (!vif->csa_active)
 		return;
 
-	dev->csa_complete |= ieee80211_beacon_cntdwn_is_complete(vif);
+	dev->csa_complete |= ieee80211_csa_is_complete(vif);
 }
 
 void mt76_csa_check(struct mt76_dev *dev)

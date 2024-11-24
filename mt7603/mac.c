@@ -200,10 +200,9 @@ void mt7603_filter_tx(struct mt7603_dev *dev, int idx, bool abort)
 			FIELD_PREP(MT_DMA_FQCR0_DEST_PORT_ID, port) |
 			FIELD_PREP(MT_DMA_FQCR0_DEST_QUEUE_ID, queue));
 
-		mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY, 0, 15000);
+		WARN_ON_ONCE(!mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY,
+					0, 5000));
 	}
-
-	WARN_ON_ONCE(mt76_rr(dev, MT_DMA_FQCR0) & MT_DMA_FQCR0_BUSY);
 
 	mt76_wr(dev, MT_TX_ABORT, 0);
 
@@ -615,6 +614,11 @@ mt7603_mac_fill_rx(struct mt7603_dev *dev, struct sk_buff *skb)
 					  dev->rssi_offset[0];
 		status->chain_signal[1] = FIELD_GET(MT_RXV4_IB_RSSI1, rxdg3) +
 					  dev->rssi_offset[1];
+
+		status->signal = status->chain_signal[0];
+		if (status->chains & BIT(1))
+			status->signal = max(status->signal,
+					     status->chain_signal[1]);
 
 		if (FIELD_GET(MT_RXV1_FRAME_MODE, rxdg0) == 1)
 			status->bw = RATE_INFO_BW_40;
@@ -1101,7 +1105,7 @@ mt7603_fill_txs(struct mt7603_dev *dev, struct mt7603_sta *sta,
 	}
 
 	rate_set_tsf = READ_ONCE(sta->rate_set_tsf);
-	rs_idx = !((u32)(le32_get_bits(txs_data[1], MT_TXS1_F0_TIMESTAMP) -
+	rs_idx = !((u32)(FIELD_GET(MT_TXS1_F0_TIMESTAMP, le32_to_cpu(txs_data[1])) -
 			 rate_set_tsf) < 1000000);
 	rs_idx ^= rate_set_tsf & BIT(0);
 	rs = &sta->rateset[rs_idx];
@@ -1195,7 +1199,7 @@ mt7603_mac_add_txs_skb(struct mt7603_dev *dev, struct mt7603_sta *sta, int pid,
 		struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 
 		if (!mt7603_fill_txs(dev, sta, info, txs_data)) {
-			info->status.rates[0].count = 0;
+			ieee80211_tx_info_clear_status(info);
 			info->status.rates[0].idx = -1;
 		}
 
@@ -1213,11 +1217,14 @@ void mt7603_mac_add_txs(struct mt7603_dev *dev, void *data)
 	struct mt7603_sta *msta = NULL;
 	struct mt76_wcid *wcid;
 	__le32 *txs_data = data;
+	u32 txs;
 	u8 wcidx;
 	u8 pid;
 
-	pid = le32_get_bits(txs_data[4], MT_TXS4_PID);
-	wcidx = le32_get_bits(txs_data[3], MT_TXS3_WCID);
+	txs = le32_to_cpu(txs_data[4]);
+	pid = FIELD_GET(MT_TXS4_PID, txs);
+	txs = le32_to_cpu(txs_data[3]);
+	wcidx = FIELD_GET(MT_TXS3_WCID, txs);
 
 	if (pid == MT_PACKET_ID_NO_ACK)
 		return;

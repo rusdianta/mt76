@@ -155,14 +155,14 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 		return;
 
 	if (!status->aggr) {
-		if (!(status->flag & BIT(30)))
-			mt76_rx_aggr_check_ctl(skb, frames);
+		mt76_rx_aggr_check_ctl(skb, frames);
 		return;
 	}
 
 	/* not part of a BA session */
 	ackp = *ieee80211_get_qos_ctl(hdr) & IEEE80211_QOS_CTL_ACK_POLICY_MASK;
-	if (ackp == IEEE80211_QOS_CTL_ACK_POLICY_NOACK)
+	if (ackp != IEEE80211_QOS_CTL_ACK_POLICY_BLOCKACK &&
+	    ackp != IEEE80211_QOS_CTL_ACK_POLICY_NORMAL)
 		return;
 
 	tid = rcu_dereference(wcid->aggr[status->tid]);

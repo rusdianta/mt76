@@ -103,7 +103,6 @@ static int mt76_led_init(struct mt76_dev *dev)
 		if (!of_property_read_u32(np, "led-sources", &led_pin))
 			dev->led_pin = led_pin;
 		dev->led_al = of_property_read_bool(np, "led-active-low");
-		of_node_put(np);
 	}
 
 	return led_classdev_register(dev->dev, &dev->led_cdev);
@@ -142,8 +141,6 @@ static void mt76_init_stream_cap(struct mt76_dev *dev,
 		vht_cap->cap |= IEEE80211_VHT_CAP_TXSTBC;
 	else
 		vht_cap->cap &= ~IEEE80211_VHT_CAP_TXSTBC;
-	vht_cap->cap |= IEEE80211_VHT_CAP_TX_ANTENNA_PATTERN |
-			IEEE80211_VHT_CAP_RX_ANTENNA_PATTERN;
 
 	for (i = 0; i < 8; i++) {
 		if (i < nstream)
@@ -215,6 +212,8 @@ mt76_init_sband(struct mt76_dev *dev, struct mt76_sband *msband,
 	vht_cap->cap |= IEEE80211_VHT_CAP_RXLDPC |
 			IEEE80211_VHT_CAP_RXSTBC_1 |
 			IEEE80211_VHT_CAP_SHORT_GI_80 |
+			IEEE80211_VHT_CAP_RX_ANTENNA_PATTERN |
+			IEEE80211_VHT_CAP_TX_ANTENNA_PATTERN |
 			(3 << IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_SHIFT);
 
 	return 0;
@@ -556,36 +555,6 @@ void mt76_wcid_key_setup(struct mt76_dev *dev, struct mt76_wcid *wcid,
 }
 EXPORT_SYMBOL(mt76_wcid_key_setup);
 
-static int
-mt76_rx_signal(struct mt76_rx_status *status)
-{
-	s8 *chain_signal = status->chain_signal;
-	int signal = -128;
-	u8 chains;
-
-	for (chains = status->chains; chains; chains >>= 1, chain_signal++) {
-		int cur, diff;
-
-		cur = *chain_signal;
-		if (!(chains & BIT(0)) ||
-		    cur > 0)
-				continue;
-
-		if (cur > signal)
-			swap(cur, signal);
-
-		diff = signal - cur;
-		if (diff == 0)
-			signal += 3;
-		else if (diff <= 2)
-			signal += 2;
-		else if (diff <= 6)
-			signal += 1;
-	}
-
-	return signal;
-}
-
 static struct ieee80211_sta *mt76_rx_convert(struct sk_buff *skb)
 {
 	struct ieee80211_rx_status *status = IEEE80211_SKB_RXCB(skb);
@@ -605,9 +574,6 @@ static struct ieee80211_sta *mt76_rx_convert(struct sk_buff *skb)
 	status->signal = mstat.signal;
 	status->chains = mstat.chains;
 	status->ampdu_reference = mstat.ampdu_ref;
-	status->signal = mt76_rx_signal(&mstat);
-	if (status->signal <= -128)
-		status->flag |= RX_FLAG_NO_SIGNAL_VAL;
 
 	BUILD_BUG_ON(sizeof(mstat) > sizeof(skb->cb));
 	BUILD_BUG_ON(sizeof(status->chain_signal) !=
@@ -627,9 +593,6 @@ mt76_check_ccmp_pn(struct sk_buff *skb)
 	int ret;
 
 	if (!(status->flag & RX_FLAG_DECRYPTED))
-		return 0;
-
-	if (status->flag & RX_FLAG_ONLY_MONITOR)
 		return 0;
 
 	if (!wcid || !wcid->rx_check_pn)
@@ -790,12 +753,10 @@ mt76_check_sta(struct mt76_dev *dev, struct sk_buff *skb)
 
 	if (ps)
 		set_bit(MT_WCID_FLAG_PS, &wcid->flags);
-
-	dev->drv->sta_ps(dev, sta, ps);
-
-	if (!ps)
+	else
 		clear_bit(MT_WCID_FLAG_PS, &wcid->flags);
 
+	dev->drv->sta_ps(dev, sta, ps);
 	ieee80211_sta_ps_transition(sta, ps);
 
 	if (ps)

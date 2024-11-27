@@ -170,11 +170,11 @@ int mt7603_eeprom_init(struct mt7603_dev *dev)
 	memcpy(dev->mt76.macaddr, eeprom + MT_EE_MAC_ADDR, ETH_ALEN);
 
 	/* Check for 1SS devices */
-	dev->mphy.antenna_mask = 3;
+	dev->mt76.antenna_mask = 3;
 	if (FIELD_GET(MT_EE_NIC_CONF_0_RX_PATH, eeprom[MT_EE_NIC_CONF_0]) == 1 ||
 	    FIELD_GET(MT_EE_NIC_CONF_0_TX_PATH, eeprom[MT_EE_NIC_CONF_0]) == 1 ||
 	    is_mt7688(dev))
-		dev->mphy.antenna_mask = 1;
+		dev->mt76.antenna_mask = 1;
 
 	mt76_eeprom_override(&dev->mt76);
 

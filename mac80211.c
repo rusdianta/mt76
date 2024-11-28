@@ -275,6 +275,7 @@ mt76_alloc_device(struct device *pdev, unsigned int size,
 {
 	struct ieee80211_hw *hw;
 	struct mt76_dev *dev;
+	int i;
 
 	hw = ieee80211_alloc_hw(size, ops);
 	if (!hw)
@@ -292,6 +293,10 @@ mt76_alloc_device(struct device *pdev, unsigned int size,
 	init_waitqueue_head(&dev->tx_wait);
 	skb_queue_head_init(&dev->status_list);
 
+	INIT_LIST_HEAD(&dev->txwi_cache);
+	for (i = 0; i < ARRAY_SIZE(dev->q_rx); i++)
+		skb_queue_head_init(&dev->rx_skb[i]);
+
 	tasklet_init(&dev->tx_tasklet, mt76_tx_tasklet, (unsigned long)dev);
 
 	return dev;
@@ -307,8 +312,6 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 
 	dev_set_drvdata(dev->dev, dev);
 
-	INIT_LIST_HEAD(&dev->txwi_cache);
-
 	SET_IEEE80211_DEV(hw, dev->dev);
 	SET_IEEE80211_PERM_ADDR(hw, dev->macaddr);
 
@@ -321,7 +324,9 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 	wiphy->available_antennas_rx = dev->antenna_mask;
 
 	hw->txq_data_size = sizeof(struct mt76_txq);
-	hw->max_tx_fragments = 16;
+
+	if (!hw->max_tx_fragments)
+		hw->max_tx_fragments = 16;
 
 	ieee80211_hw_set(hw, SIGNAL_DBM);
 	ieee80211_hw_set(hw, PS_NULLFUNC_STACK);
@@ -510,6 +515,9 @@ int mt76_get_survey(struct ieee80211_hw *hw, int idx,
 	survey->channel = chan;
 	survey->filled = SURVEY_INFO_TIME | SURVEY_INFO_TIME_BUSY;
 	survey->filled |= dev->drv->survey_flags;
+	if (state->noise)
+		survey->filled |= SURVEY_INFO_NOISE_DBM;
+
 	if (chan == dev->main_chan) {
 		survey->filled |= SURVEY_INFO_IN_USE;
 
@@ -520,6 +528,7 @@ int mt76_get_survey(struct ieee80211_hw *hw, int idx,
 	survey->time_busy = div_u64(state->cc_busy, 1000);
 	survey->time_rx = div_u64(state->cc_rx, 1000);
 	survey->time = div_u64(state->cc_active, 1000);
+	survey->noise = state->noise;
 
 	spin_lock_bh(&dev->cc_lock);
 	survey->time_bss_rx = div_u64(state->cc_bss_rx, 1000);

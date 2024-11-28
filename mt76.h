@@ -237,6 +237,8 @@ struct mt76_rx_tid {
 	u8 size;
 	u8 nframes;
 
+	u8 num;
+
 	u8 started:1, stopped:1, timer_pending:1;
 
 	struct sk_buff *reorder_buf[];
@@ -322,6 +324,8 @@ struct mt76_channel_state {
 	u64 cc_rx;
 	u64 cc_bss_rx;
 	u64 cc_tx;
+
+	s8 noise;
 };
 
 struct mt76_sband {
@@ -367,8 +371,8 @@ enum mt76u_in_ep {
 
 enum mt76u_out_ep {
 	MT_EP_OUT_INBAND_CMD,
-	MT_EP_OUT_AC_BK,
 	MT_EP_OUT_AC_BE,
+	MT_EP_OUT_AC_BK,
 	MT_EP_OUT_AC_VI,
 	MT_EP_OUT_AC_VO,
 	MT_EP_OUT_HCCA,
@@ -382,6 +386,7 @@ enum mt76u_out_ep {
 #define MCU_RESP_URB_SIZE	1024
 struct mt76_usb {
 	struct mutex usb_ctrl_mtx;
+	__le32 reg_val;
 	u8 *data;
 	u16 data_len;
 

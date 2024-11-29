@@ -306,7 +306,7 @@ s8 mt76_get_rate_power_limits(struct mt76_dev *dev,
 
 	np = mt76_find_channel_node(np, chan);
 	if (!np)
-		return target_power
+		return target_power;
 	txs_delta = mt76_get_txs_delta(np, hweight8(phy->antenna_mask));
 
 	val = mt76_get_of_array(np, "cck", &len, ARRAY_SIZE(dest->cck));

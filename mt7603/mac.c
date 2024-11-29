@@ -4,6 +4,7 @@
 #include <linux/timekeeping.h>
 #include "mt7603.h"
 #include "mac.h"
+#include "../trace.h"
 
 #define MT_PSE_PAGE_SIZE	128
 
@@ -50,10 +51,11 @@ void mt7603_mac_set_timing(struct mt7603_dev *dev)
 	int offset = 3 * dev->coverage_class;
 	u32 reg_offset = FIELD_PREP(MT_TIMEOUT_VAL_PLCP, offset) |
 			 FIELD_PREP(MT_TIMEOUT_VAL_CCA, offset);
+	bool is_5ghz = dev->mphy.chandef.chan->band == NL80211_BAND_5GHZ;
 	int sifs;
 	u32 val;
 
-	if (dev->mt76.chandef.chan->band == NL80211_BAND_5GHZ)
+	if (is_5ghz)
 		sifs = 16;
 	else
 		sifs = 10;
@@ -70,7 +72,7 @@ void mt7603_mac_set_timing(struct mt7603_dev *dev)
 		FIELD_PREP(MT_IFS_SIFS, sifs) |
 		FIELD_PREP(MT_IFS_SLOT, dev->slottime));
 
-	if (dev->slottime < 20)
+	if (dev->slottime < 20 || is_5ghz)
 		val = MT7603_CFEND_RATE_DEFAULT;
 	else
 		val = MT7603_CFEND_RATE_11B;
@@ -318,10 +320,15 @@ void mt7603_wtbl_update_cap(struct mt7603_dev *dev, struct ieee80211_sta *sta)
 {
 	struct mt7603_sta *msta = (struct mt7603_sta *)sta->drv_priv;
 	int idx = msta->wcid.idx;
+	u8 ampdu_density;
 	u32 addr;
 	u32 val;
 
 	addr = mt7603_wtbl1_addr(idx);
+
+	ampdu_density = sta->ht_cap.ampdu_density;
+	if (ampdu_density < IEEE80211_HT_MPDU_DENSITY_4)
+		ampdu_density = IEEE80211_HT_MPDU_DENSITY_4;
 
 	val = mt76_rr(dev, addr + 2 * 4);
 	val &= MT_WTBL1_W2_KEY_TYPE | MT_WTBL1_W2_ADMISSION_CONTROL;
@@ -467,7 +474,7 @@ mt7603_rx_get_wcid(struct mt7603_dev *dev, u8 idx, bool unicast)
 	struct mt7603_sta *sta;
 	struct mt76_wcid *wcid;
 
-	if (idx >= ARRAY_SIZE(dev->mt76.wcid))
+	if (idx >= MT7603_WTBL_SIZE)
 		return NULL;
 
 	wcid = rcu_dereference(dev->mt76.wcid[idx]);
@@ -1101,7 +1108,7 @@ mt7603_fill_txs(struct mt7603_dev *dev, struct mt7603_sta *sta,
 	if (ampdu || (info->flags & IEEE80211_TX_CTL_AMPDU))
 		info->flags |= IEEE80211_TX_STAT_AMPDU | IEEE80211_TX_CTL_AMPDU;
 
-	first_idx = max_t(int, 0, last_idx - (count + 1) / MT7603_RATE_RETRY);
+	first_idx = max_t(int, 0, last_idx - (count - 1) / MT7603_RATE_RETRY);
 
 	if (fixed_rate && !probe) {
 		info->status.rates[0].count = count;
@@ -1198,6 +1205,8 @@ mt7603_mac_add_txs_skb(struct mt7603_dev *dev, struct mt7603_sta *sta, int pid,
 	if (pid < MT_PACKET_ID_FIRST)
 		return false;
 
+	trace_mac_txdone(mdev, sta->wcid.idx, pid);
+
 	mt76_tx_status_lock(mdev, &list);
 	skb = mt76_tx_status_skb_get(mdev, &sta->wcid, pid, &list);
 	if (skb) {
@@ -1234,7 +1243,7 @@ void mt7603_mac_add_txs(struct mt7603_dev *dev, void *data)
 	if (pid == MT_PACKET_ID_NO_ACK)
 		return;
 
-	if (wcidx >= ARRAY_SIZE(dev->mt76.wcid))
+	if (wcidx >= MT7603_WTBL_SIZE)
 		return;
 
 	rcu_read_lock();
@@ -1435,8 +1444,9 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
 	for (i = 0; i < ARRAY_SIZE(dev->mt76.q_tx); i++)
 		mt76_queue_tx_cleanup(dev, i, true);
 
-	for (i = 0; i < ARRAY_SIZE(dev->mt76.q_rx); i++)
+	mt76_for_each_q_rx(&dev->mt76, i) {
 		mt76_queue_rx_reset(dev, i);
+	}
 
 	mt7603_dma_sched_reset(dev);
 

@@ -20,6 +20,8 @@ irqreturn_t mt7603_irq_handler(int irq, void *dev_instance)
 	if (!test_bit(MT76_STATE_INITIALIZED, &dev->mt76.state))
 		return IRQ_NONE;
 
+	trace_dev_irq(&dev->mt76, intr, dev->mt76.mmio.irqmask);
+
 	intr &= dev->mt76.mmio.irqmask;
 
 	if (intr & MT_INT_MAC_IRQ3) {

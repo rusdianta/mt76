@@ -121,11 +121,12 @@ static bool mt76_string_prop_find(struct property *prop, const char *str)
 	return false;
 }
 
-static struct device_node *
+struct device_node *
 mt76_find_power_limits_node(struct mt76_dev *dev)
 {
 	struct device_node *np = dev->dev->of_node;
 	const char *const region_names[] = {
+		[NL80211_DFS_UNSET] = "ww",
 		[NL80211_DFS_ETSI] = "etsi",
 		[NL80211_DFS_FCC] = "fcc",
 		[NL80211_DFS_JP] = "jp",
@@ -150,40 +151,56 @@ mt76_find_power_limits_node(struct mt76_dev *dev)
 		}
 
 		if (mt76_string_prop_find(country, dev->alpha2) ||
-		    mt76_string_prop_find(regd, region_name))
+		    mt76_string_prop_find(regd, region_name)) {
+			of_node_put(np);
 			return cur;
+		}
 	}
+
+	of_node_put(np);
 	return fallback;
 }
+EXPORT_SYMBOL_GPL(mt76_find_power_limits_node);
+
 static const __be32 *
 mt76_get_of_array(struct device_node *np, char *name, size_t *len, int min)
 {
 	struct property *prop = of_find_property(np, name, NULL);
+
 	if (!prop || !prop->value || prop->length < min * 4)
 		return NULL;
+
 	*len = prop->length;
+
 	return prop->value;
 }
-static struct device_node *
+
+struct device_node *
 mt76_find_channel_node(struct device_node *np, struct ieee80211_channel *chan)
 {
 	struct device_node *cur;
 	const __be32 *val;
 	size_t len;
+
 	for_each_child_of_node(np, cur) {
 		val = mt76_get_of_array(cur, "channels", &len, 2);
 		if (!val)
 			continue;
+
 		while (len >= 2 * sizeof(*val)) {
 			if (chan->hw_value >= be32_to_cpu(val[0]) &&
 			    chan->hw_value <= be32_to_cpu(val[1]))
 				return cur;
+
 			val += 2;
 			len -= 2 * sizeof(*val);
 		}
 	}
+
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(mt76_find_channel_node);
+
 
 static s8
 mt76_get_txs_delta(struct device_node *np, u8 nss)

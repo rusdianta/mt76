@@ -647,14 +647,6 @@ mt76_airtime_report(struct mt76_dev *dev, struct mt76_rx_status *status,
 		    int len)
 {
 	struct mt76_wcid *wcid = status->wcid;
-	struct ieee80211_rx_status info = {
-		.enc_flags = status->enc_flags,
-		.rate_idx = status->rate_idx,
-		.encoding = status->encoding,
-		.band = status->band,
-		.nss = status->nss,
-		.bw = status->bw,
-	};
 	struct ieee80211_sta *sta;
 	u32 airtime;
 

@@ -37,7 +37,7 @@ mt76_wcid_mask_clear(u32 *mask, int idx)
 }
 
 static inline void
-mt76_wcid_free(unsigned long *mask, int idx)
+mt76_wcid_free(u32 *mask, int idx)
 {
 	mask[idx / BITS_PER_LONG] &= ~BIT(idx % BITS_PER_LONG);
 }

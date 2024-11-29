@@ -261,12 +261,11 @@ mt76_apply_multi_array_limit(s8 *pwr, size_t pwr_len, s8 pwr_num,
 	}
 }
 
-s8 mt76_get_rate_power_limits(struct mt76_phy *phy,
+s8 mt76_get_rate_power_limits(struct mt76_dev *dev,
 			      struct ieee80211_channel *chan,
 			      struct mt76_power_limits *dest,
 			      s8 target_power)
 {
-	struct mt76_dev *dev = phy->dev;
 	struct device_node *np;
 	const __be32 *val;
 	char name[16];

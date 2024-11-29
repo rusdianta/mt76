@@ -325,7 +325,6 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 
 	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_CQM_RSSI_LIST);
 	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_AIRTIME_FAIRNESS);
-	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_AQL);
 
 	wiphy->available_antennas_tx = dev->antenna_mask;
 	wiphy->available_antennas_rx = dev->antenna_mask;

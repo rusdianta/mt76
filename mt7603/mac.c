@@ -51,7 +51,7 @@ void mt7603_mac_set_timing(struct mt7603_dev *dev)
 	int offset = 3 * dev->coverage_class;
 	u32 reg_offset = FIELD_PREP(MT_TIMEOUT_VAL_PLCP, offset) |
 			 FIELD_PREP(MT_TIMEOUT_VAL_CCA, offset);
-	bool is_5ghz = dev->mphy.chandef.chan->band == NL80211_BAND_5GHZ;
+	bool is_5ghz = dev->mt76.chandef.chan->band == NL80211_BAND_5GHZ;
 	int sifs;
 	u32 val;
 

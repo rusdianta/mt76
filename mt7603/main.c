@@ -569,7 +569,6 @@ mt7603_ampdu_action(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	u16 ssn = params->ssn;
 	u8 ba_size = params->buf_size;
 	struct mt76_txq *mtxq;
-	int ret = 0;
 
 	if (!txq)
 		return -EINVAL;
@@ -598,7 +597,7 @@ mt7603_ampdu_action(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		break;
 	case IEEE80211_AMPDU_TX_START:
 		mtxq->agg_ssn = IEEE80211_SN_TO_SEQ(ssn);
-		ret = IEEE80211_AMPDU_TX_START_IMMEDIATE;
+		ieee80211_start_tx_ba_cb_irqsafe(vif, sta->addr, tid);
 		break;
 	case IEEE80211_AMPDU_TX_STOP_CONT:
 		mtxq->aggr = false;
@@ -608,7 +607,7 @@ mt7603_ampdu_action(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 	mutex_unlock(&dev->mt76.mutex);
 
-	return ret;
+	return 0;
 }
 
 static void

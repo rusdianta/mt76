@@ -93,6 +93,8 @@ struct mt76_queue_entry {
 		struct mt76_txwi_cache *txwi;
 		struct urb *urb;
 	};
+	u32 dma_addr[2];
+	u16 dma_len[2];
 	enum mt76_txq_id qid;
 	bool skip_buf0:1;
 	bool schedule:1;
@@ -132,7 +134,6 @@ struct mt76_queue {
 struct mt76_sw_queue {
 	struct mt76_queue *q;
 
-	struct list_head swq;
 	int swq_queued;
 };
 
@@ -272,13 +273,22 @@ struct mt76_tx_cb {
 
 enum {
 	MT76_STATE_INITIALIZED,
+	MT76_STATE_REGISTERED,
 	MT76_STATE_RUNNING,
 	MT76_STATE_MCU_RUNNING,
 	MT76_SCANNING,
+	MT76_HW_SCANNING,
+	MT76_HW_SCHED_SCANNING,
 	MT76_RESTART,
 	MT76_RESET,
+	MT76_MCU_RESET,
 	MT76_REMOVED,
 	MT76_READING_STATS,
+	MT76_STATE_POWER_OFF,
+	MT76_STATE_SUSPEND,
+	MT76_STATE_ROC,
+	MT76_STATE_PM,
+	MT76_STATE_WED_RESET,
 };
 
 struct mt76_hw_cap {
@@ -303,7 +313,7 @@ struct mt76_driver_ops {
 			      struct ieee80211_sta *sta,
 			      struct mt76_tx_info *tx_info);
 
-	void (*tx_complete_skb)(struct mt76_dev *dev, enum mt76_txq_id qid,
+	void (*tx_complete_skb)(struct mt76_dev *dev,
 				struct mt76_queue_entry *e);
 
 	bool (*tx_status_data)(struct mt76_dev *dev, u8 *update);

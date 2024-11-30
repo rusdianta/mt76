@@ -151,6 +151,8 @@ struct mt76_mcu_ops {
 
 	int (*mcu_send_msg)(struct mt76_dev *dev, int cmd, const void *data,
 			    int len, bool wait_resp);
+	int (*mcu_parse_response)(struct mt76_dev *dev, int cmd,
+				  struct sk_buff *skb, int seq);
 	int (*mcu_wr_rp)(struct mt76_dev *dev, u32 base,
 			 const struct mt76_reg_pair *rp, int len);
 	int (*mcu_rd_rp)(struct mt76_dev *dev, u32 base,

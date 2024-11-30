@@ -162,14 +162,7 @@ mt76_dma_tx_cleanup(struct mt76_dev *dev, enum mt76_txq_id qid, bool flush)
 
 	while ((q->queued > n_queued) && q->tail != last) {
 		mt76_dma_tx_cleanup_idx(dev, q, q->tail, &entry);
-		if (entry.schedule)
-			n_swq_queued[entry.wcid]++;
-
-		q->tail = (q->tail + 1) % q->ndesc;
-		n_queued++;
-
-		if (entry.skb)
-			dev->drv->tx_complete_skb(dev, &entry);
+		mt76_queue_tx_complete(dev, q, &entry);
 
 		if (entry.txwi) {
 			if (!(dev->drv->drv_flags & MT_DRV_TXWI_NO_FREE))
@@ -181,19 +174,11 @@ mt76_dma_tx_cleanup(struct mt76_dev *dev, enum mt76_txq_id qid, bool flush)
 			last = readl(&q->regs->dma_idx);
 	}
 
-	spin_lock_bh(&q->lock);
-
-	q->queued -= n_queued;
-	for (i = 0; i < ARRAY_SIZE(n_swq_queued); i++) {
-		if (!n_swq_queued[i])
-			continue;
-
-		dev->q_tx[i] -= n_swq_queued[i];
-	}
-
 	if (flush) {
+		spin_lock_bh(&q->lock);
 		mt76_dma_sync_idx(dev, q);
 		mt76_dma_kick_queue(dev, q);
+		spin_unlock_bh(&q->lock);
 	}
 
 	wake = wake && q->stopped &&
@@ -203,8 +188,6 @@ mt76_dma_tx_cleanup(struct mt76_dev *dev, enum mt76_txq_id qid, bool flush)
 
 	if (!q->queued)
 		wake_up(&dev->tx_wait);
-
-	spin_unlock_bh(&q->lock);
 
 	if (wake)
 		ieee80211_wake_queue(dev->hw, qid);

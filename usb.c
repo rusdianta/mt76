@@ -670,40 +670,26 @@ static void mt76u_tx_tasklet(unsigned long data)
 	int i;
 
 	for (i = 0; i < IEEE80211_NUM_ACS; i++) {
-		u32 n_dequeued = 0, n_sw_dequeued = 0;
 
 		q = dev->q_tx[i];
 
-		while (q->queued > n_dequeued) {
-			if (!q->entry[q->head].done)
+		while (q->queued > 0) {
+			if (!q->entry[q->tail].done)
 				break;
 
-			if (q->entry[q->head].schedule) {
-				q->entry[q->head].schedule = false;
-				n_sw_dequeued++;
-			}
+			entry = q->entry[q->tail];
+			q->entry[q->tail].done = false;
+			q->entry[q->tail].schedule = false;
 
-			entry = q->entry[q->head];
-			q->entry[q->head].done = false;
-			q->head = (q->head + 1) % q->ndesc;
-			n_dequeued++;
-
-			dev->drv->tx_complete_skb(dev, &entry);
+			mt76_queue_tx_complete(dev, q, &entry);
 		}
-
-		spin_lock_bh(&q->lock);
-
-		sq->swq_queued -= n_sw_dequeued;
-		q->queued -= n_dequeued;
-
+		
 		wake = q->stopped && q->queued < q->ndesc - 8;
 		if (wake)
 			q->stopped = false;
 
 		if (!q->queued)
 			wake_up(&dev->tx_wait);
-
-		spin_unlock_bh(&q->lock);
 
 		mt76_txq_schedule(dev, i);
 
@@ -901,18 +887,15 @@ void mt76u_stop_tx(struct mt76_dev *dev)
 		 * will fail to submit urb, cleanup those skb's manually.
 		 */
 		for (i = 0; i < IEEE80211_NUM_ACS; i++) {
-			q = dev->q_tx[i];
+			q = dev->q_tx[i].q;
+			if (!q)
+				continue;
 
-			/* Assure we are in sync with killed tasklet. */
-			spin_lock_bh(&q->lock);
-			while (q->queued) {
-				entry = q->entry[q->head];
-				q->head = (q->head + 1) % q->ndesc;
-				q->queued--;
+			entry = q->entry[q->tail];
+			q->entry[q->tail].done = false;
+			q->entry[q->tail].schedule = false;
 
-				dev->drv->tx_complete_skb(dev, &entry);
-			}
-			spin_unlock_bh(&q->lock);
+			mt76_queue_tx_complete(dev, q, &entry);
 		}
 	}
 

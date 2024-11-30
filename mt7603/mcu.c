@@ -11,6 +11,7 @@ struct mt7603_fw_trailer {
 	char fw_ver[10];
 	char build_date[15];
 	__le32 dl_len;
+}
 
 static int
 mt7603_mcu_parse_response(struct mt76_dev *mdev, int cmd,

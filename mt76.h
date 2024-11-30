@@ -151,6 +151,8 @@ struct mt76_mcu_ops {
 
 	int (*mcu_send_msg)(struct mt76_dev *dev, int cmd, const void *data,
 			    int len, bool wait_resp);
+	int (*mcu_skb_send_msg)(struct mt76_dev *dev, struct sk_buff *skb,
+				int cmd, int *seq);
 	int (*mcu_parse_response)(struct mt76_dev *dev, int cmd,
 				  struct sk_buff *skb, int seq);
 	int (*mcu_wr_rp)(struct mt76_dev *dev, u32 base,
@@ -430,6 +432,7 @@ struct mt76_usb {
 		struct mutex mutex;
 		u8 *data;
 		u32 msg_seq;
+		int timeout;
 
 		/* multiple reads */
 		struct mt76_reg_pair *rp;
@@ -610,7 +613,6 @@ enum mt76_phy_type {
 #define mt76_wr_rp(dev, ...)	(dev)->mt76.bus->wr_rp(&((dev)->mt76), __VA_ARGS__)
 #define mt76_rd_rp(dev, ...)	(dev)->mt76.bus->rd_rp(&((dev)->mt76), __VA_ARGS__)
 
-#define mt76_mcu_send_msg(dev, ...)	(dev)->mt76.mcu_ops->mcu_send_msg(&((dev)->mt76), __VA_ARGS__)
 #define __mt76_mcu_send_msg(dev, ...)	(dev)->mcu_ops->mcu_send_msg((dev), __VA_ARGS__)
 #define mt76_mcu_restart(dev, ...)	(dev)->mt76.mcu_ops->mcu_restart(&((dev)->mt76))
 #define __mt76_mcu_restart(dev, ...)	(dev)->mcu_ops->mcu_restart((dev))
@@ -916,6 +918,23 @@ mt76_mcu_msg_alloc(struct mt76_dev *dev, const void *data,
 void mt76_mcu_rx_event(struct mt76_dev *dev, struct sk_buff *skb);
 struct sk_buff *mt76_mcu_get_response(struct mt76_dev *dev,
 				      unsigned long expires);
+
+int mt76_mcu_send_and_get_msg(struct mt76_dev *dev, int cmd, const void *data,
+			      int len, bool wait_resp, struct sk_buff **ret);
+int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
+				  int cmd, bool wait_resp, struct sk_buff **ret);
+static inline int
+mt76_mcu_send_msg(struct mt76_dev *dev, int cmd, const void *data, int len,
+		  bool wait_resp)
+{
+	return mt76_mcu_send_and_get_msg(dev, cmd, data, len, wait_resp, NULL);
+}
+static inline int
+mt76_mcu_skb_send_msg(struct mt76_dev *dev, struct sk_buff *skb, int cmd,
+		      bool wait_resp)
+{
+	return mt76_mcu_skb_send_and_get_msg(dev, skb, cmd, wait_resp, NULL);
+}
 
 void mt76_set_irq_mask(struct mt76_dev *dev, u32 addr, u32 clear, u32 set);
 

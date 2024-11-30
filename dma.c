@@ -188,7 +188,7 @@ mt76_dma_tx_cleanup(struct mt76_dev *dev, enum mt76_txq_id qid, bool flush)
 		if (!n_swq_queued[i])
 			continue;
 
-		dev->q_tx[i].swq_queued -= n_swq_queued[i];
+		dev->q_tx[i] -= n_swq_queued[i];
 	}
 
 	if (flush) {

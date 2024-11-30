@@ -102,6 +102,7 @@ struct mt76_queue_entry {
 	u16 wcid;
 	bool skip_buf0:1;
 	bool skip_buf1:1;
+	bool schedule:1;
 	bool done:1;
 };
 

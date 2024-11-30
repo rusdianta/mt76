@@ -16,10 +16,12 @@
 #include <net/mac80211.h>
 #include "util.h"
 
-#define MT_TX_RING_SIZE     256
 #define MT_MCU_RING_SIZE    32
 #define MT_RX_BUF_SIZE      2048
 #define MT_SKB_HEAD_LEN     128
+
+#define MT_MAX_NON_AQL_PKT  16
+#define MT_TXQ_FREE_THR     32
 
 struct mt76_dev;
 struct mt76_wcid;
@@ -74,7 +76,8 @@ enum mt76_rxq_id {
 
 struct mt76_queue_buf {
 	dma_addr_t addr;
-	int len;
+	u16 len;
+	bool skip_unmap;
 };
 
 struct mt76_tx_info {
@@ -92,10 +95,13 @@ struct mt76_queue_entry {
 	union {
 		struct mt76_txwi_cache *txwi;
 		struct urb *urb;
+		int buf_sz;
 	};
-	enum mt76_txq_id qid;
+	u32 dma_addr[2];
+	u16 dma_len[2];
+	u16 wcid;
 	bool skip_buf0:1;
-	bool schedule:1;
+	bool skip_buf1:1;
 	bool done:1;
 };
 
@@ -127,13 +133,6 @@ struct mt76_queue {
 	dma_addr_t desc_dma;
 	struct sk_buff *rx_head;
 	struct page_frag_cache rx_page;
-};
-
-struct mt76_sw_queue {
-	struct mt76_queue *q;
-
-	struct list_head swq;
-	int swq_queued;
 };
 
 struct mt76_mcu_ops {
@@ -194,6 +193,7 @@ DECLARE_EWMA(signal, 10, 8);
 struct mt76_wcid {
 	struct mt76_rx_tid __rcu *aggr[IEEE80211_NUM_TIDS];
 
+	atomic_t non_aql_packets;
 	unsigned long flags;
 
 	struct ewma_signal rssi;
@@ -215,7 +215,7 @@ struct mt76_wcid {
 };
 
 struct mt76_txq {
-	struct mt76_sw_queue *swq;
+	struct mt76_queue *q;
 	struct mt76_wcid *wcid;
 
 	struct sk_buff_head retry_q;
@@ -303,7 +303,7 @@ struct mt76_driver_ops {
 			      struct ieee80211_sta *sta,
 			      struct mt76_tx_info *tx_info);
 
-	void (*tx_complete_skb)(struct mt76_dev *dev, enum mt76_txq_id qid,
+	void (*tx_complete_skb)(struct mt76_dev *dev,
 				struct mt76_queue_entry *e);
 
 	bool (*tx_status_data)(struct mt76_dev *dev, u8 *update);
@@ -491,7 +491,7 @@ struct mt76_dev {
 	u32 ampdu_ref;
 
 	struct list_head txwi_cache;
-	struct mt76_sw_queue q_tx[__MT_TXQ_MAX];
+	struct mt76_queue *q_tx[__MT_TXQ_MAX];
 	struct mt76_queue q_rx[__MT_RXQ_MAX];
 	const struct mt76_queue_ops *queue_ops;
 	int tx_dma_idx[4];
@@ -511,7 +511,6 @@ struct mt76_dev {
 
 	u8 macaddr[ETH_ALEN];
 	u32 rev;
-	unsigned long state;
 
 	u32 aggr_stats[32];
 
@@ -763,6 +762,7 @@ void mt76_txq_remove(struct mt76_dev *dev, struct ieee80211_txq *txq);
 void mt76_wake_tx_queue(struct ieee80211_hw *hw, struct ieee80211_txq *txq);
 void mt76_stop_tx_queues(struct mt76_dev *dev, struct ieee80211_sta *sta,
 			 bool send_bar);
+void mt76_tx_check_agg_ssn(struct ieee80211_sta *sta, struct sk_buff *skb);
 void mt76_txq_schedule(struct mt76_dev *dev, enum mt76_txq_id qid);
 void mt76_txq_schedule_all(struct mt76_dev *dev);
 void mt76_tx_tasklet(unsigned long data);
@@ -797,7 +797,7 @@ struct sk_buff *mt76_tx_status_skb_get(struct mt76_dev *dev,
 				       struct sk_buff_head *list);
 void mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb,
 			     struct sk_buff_head *list);
-void mt76_tx_complete_skb(struct mt76_dev *dev, struct sk_buff *skb);
+void mt76_tx_complete_skb(struct mt76_dev *dev, u16 wcid, struct sk_buff *skb);
 void mt76_tx_status_check(struct mt76_dev *dev, struct mt76_wcid *wcid,
 			  bool flush);
 int mt76_sta_state(struct ieee80211_hw *hw, struct ieee80211_vif *vif,

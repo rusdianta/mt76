@@ -672,8 +672,7 @@ static void mt76u_tx_tasklet(unsigned long data)
 	for (i = 0; i < IEEE80211_NUM_ACS; i++) {
 		u32 n_dequeued = 0, n_sw_dequeued = 0;
 
-		sq = &dev->q_tx[i];
-		q = sq->q;
+		q = dev->q_tx[i];
 
 		while (q->queued > n_dequeued) {
 			if (!q->entry[q->head].done)
@@ -689,7 +688,7 @@ static void mt76u_tx_tasklet(unsigned long data)
 			q->head = (q->head + 1) % q->ndesc;
 			n_dequeued++;
 
-			dev->drv->tx_complete_skb(dev, i, &entry);
+			dev->drv->tx_complete_skb(dev, &entry);
 		}
 
 		spin_lock_bh(&q->lock);
@@ -777,7 +776,7 @@ mt76u_tx_queue_skb(struct mt76_dev *dev, enum mt76_txq_id qid,
 		   struct sk_buff *skb, struct mt76_wcid *wcid,
 		   struct ieee80211_sta *sta)
 {
-	struct mt76_queue *q = dev->q_tx[qid].q;
+	struct mt76_queue *q = dev->q_tx[qid];
 	struct mt76_tx_info tx_info = {
 		.skb = skb,
 	};
@@ -838,7 +837,7 @@ static int mt76u_alloc_tx(struct mt76_dev *dev)
 		INIT_LIST_HEAD(&dev->q_tx[i].swq);
 
 		if (i >= IEEE80211_NUM_ACS) {
-			dev->q_tx[i].q = dev->q_tx[0].q;
+			dev->q_tx[i] = dev->q_tx[0];
 			continue;
 		}
 
@@ -848,7 +847,7 @@ static int mt76u_alloc_tx(struct mt76_dev *dev)
 
 		spin_lock_init(&q->lock);
 		q->hw_idx = mt76_ac_to_hwq(i);
-		dev->q_tx[i].q = q;
+		dev->q_tx[i] = q;
 
 		q->entry = devm_kcalloc(dev->dev,
 					MT_NUM_TX_ENTRIES, sizeof(*q->entry),
@@ -873,7 +872,7 @@ static void mt76u_free_tx(struct mt76_dev *dev)
 	int i, j;
 
 	for (i = 0; i < IEEE80211_NUM_ACS; i++) {
-		q = dev->q_tx[i].q;
+		q = dev->q_tx[i];
 		for (j = 0; j < q->ndesc; j++)
 			usb_free_urb(q->entry[j].urb);
 	}
@@ -891,7 +890,7 @@ void mt76u_stop_tx(struct mt76_dev *dev)
 		dev_err(dev->dev, "timed out waiting for pending tx\n");
 
 		for (i = 0; i < IEEE80211_NUM_ACS; i++) {
-			q = dev->q_tx[i].q;
+			q = dev->q_tx[i];
 			for (j = 0; j < q->ndesc; j++)
 				usb_kill_urb(q->entry[j].urb);
 		}
@@ -902,7 +901,7 @@ void mt76u_stop_tx(struct mt76_dev *dev)
 		 * will fail to submit urb, cleanup those skb's manually.
 		 */
 		for (i = 0; i < IEEE80211_NUM_ACS; i++) {
-			q = dev->q_tx[i].q;
+			q = dev->q_tx[i];
 
 			/* Assure we are in sync with killed tasklet. */
 			spin_lock_bh(&q->lock);
@@ -911,7 +910,7 @@ void mt76u_stop_tx(struct mt76_dev *dev)
 				q->head = (q->head + 1) % q->ndesc;
 				q->queued--;
 
-				dev->drv->tx_complete_skb(dev, i, &entry);
+				dev->drv->tx_complete_skb(dev, &entry);
 			}
 			spin_unlock_bh(&q->lock);
 		}

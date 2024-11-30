@@ -459,7 +459,7 @@ mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_queue *q,
 		
 
 		if (test_bit(MT76_STATE_PM, &dev->state) ||
-		    test_bit(MT76_RESET, &phy->state))
+		    test_bit(MT76_RESET, &dev->state))
 			return -EBUSY;
 
 			if (stop)
@@ -531,7 +531,7 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 			spin_lock_bh(&q->lock);
 		}
 
-		ret += mt76_txq_send_burst(phy, q, mtxq);
+		ret += mt76_txq_send_burst(dev, q, mtxq);
 		ieee80211_return_txq(dev->hw, txq,
 				     !skb_queue_empty(&mtxq->retry_q));
 	}

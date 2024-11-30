@@ -163,7 +163,7 @@ mt76_dma_tx_cleanup(struct mt76_dev *dev, enum mt76_txq_id qid, bool flush)
 	while ((q->queued > n_queued) && q->tail != last) {
 		mt76_dma_tx_cleanup_idx(dev, q, q->tail, &entry);
 		if (entry.schedule)
-			n_swq_queued[entry.qid]++;
+			n_swq_queued[entry.wcid]++;
 
 		q->tail = (q->tail + 1) % q->ndesc;
 		n_queued++;

@@ -431,7 +431,6 @@ mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_queue *q,
 	struct mt76_wcid *wcid = mtxq->wcid;
 	struct ieee80211_tx_info *info;
 	struct sk_buff *skb;
-	int n_frames = 1, limit;
 	int n_frames = 1;
 	bool stop = false;
 	int idx;

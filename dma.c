@@ -109,7 +109,8 @@ mt76_dma_tx_cleanup_idx(struct mt76_dev *dev, struct mt76_queue *q, int idx,
 	struct mt76_queue_entry *e = &q->entry[idx];
 
 	if (!e->skip_buf0)
-		dma_unmap_single(dev->dev, e->dma_addr[0], e->dma_len[0],
+		dma_unmap_single(dev->dma_dev, e->dma_addr[0], e->dma_len[0],
+				 DMA_TO_DEVICE);
 
 	if (!e->skip_buf1)
 		dma_unmap_single(dev->dev, e->dma_addr[1], e->dma_len[1],

@@ -72,9 +72,16 @@ enum mt76_rxq_id {
 	__MT_RXQ_MAX
 };
 
+// struct mt76_queue_buf {
+// 	dma_addr_t addr;
+// 	int len;
+
+// };
+
 struct mt76_queue_buf {
 	dma_addr_t addr;
-	int len;
+	u16 len:15,
+	    skip_unmap:1;
 };
 
 struct mt76_tx_info {

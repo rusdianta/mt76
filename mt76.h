@@ -409,6 +409,15 @@ enum mt76u_out_ep {
 	__MT_EP_OUT_MAX,
 };
 
+struct mt76_mcu {
+	struct mutex mutex;
+	u32 msg_seq;
+	int timeout;
+
+	struct sk_buff_head res_q;
+	wait_queue_head_t wait;
+};
+
 #define MT_TX_SG_MAX_SIZE	8
 #define MT_RX_SG_MAX_SIZE	4
 #define MT_NUM_TX_ENTRIES	256

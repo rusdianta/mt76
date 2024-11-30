@@ -147,10 +147,9 @@ mt76_dma_tx_cleanup(struct mt76_dev *dev, enum mt76_txq_id qid, bool flush)
 {
 	struct mt76_queue *q = dev->q_tx[qid];
 	struct mt76_queue_entry entry;
-	unsigned int n_swq_queued[4] = {};
 	unsigned int n_queued = 0;
 	bool wake = false;
-	int i, last;
+	int last;
 
 	if (!q)
 		return;

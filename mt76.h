@@ -512,6 +512,7 @@ struct mt76_dev {
 
 	u8 macaddr[ETH_ALEN];
 	u32 rev;
+	unsigned long state;
 
 	u32 aggr_stats[32];
 

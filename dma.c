@@ -66,11 +66,7 @@ mt76_dma_add_buf(struct mt76_dev *dev, struct mt76_queue *q,
 		q->head = (q->head + 1) % q->ndesc;
 
 		desc = &q->desc[idx];
-		entry = &q->entry[idx];
-
-		if (buf[0].skip_unmap)
-			entry->skip_buf0 = true;
-		entry->skip_buf1 = i == nbufs - 1;
+		entry = &q->entry[idx];		
 
 		entry->dma_addr[0] = buf[0].addr;
 		entry->dma_len[0] = buf[0].len;
@@ -81,8 +77,6 @@ mt76_dma_add_buf(struct mt76_dev *dev, struct mt76_queue *q,
 			entry->dma_len[1] = buf[1].len;
 			buf1 = buf[1].addr;
 			ctrl |= FIELD_PREP(MT_DMA_CTL_SD_LEN1, buf[1].len);
-			if (buf[1].skip_unmap)
-				entry->skip_buf1 = true;
 		}
 
 		if (i == nbufs - 1)

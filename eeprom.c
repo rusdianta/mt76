@@ -95,7 +95,7 @@ mt76_eeprom_override(struct mt76_dev *dev)
 	if (np)
 		mac = of_get_mac_address(np);
 	if (!IS_ERR_OR_NULL(mac))
-		memcpy(dev->macaddr, mac, ETH_ALEN);
+		ether_addr_copy(dev->macaddr, mac);
 #endif
 
 	if (!is_valid_ether_addr(dev->macaddr)) {
@@ -200,7 +200,6 @@ mt76_find_channel_node(struct device_node *np, struct ieee80211_channel *chan)
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(mt76_find_channel_node);
-
 
 static s8
 mt76_get_txs_delta(struct device_node *np, u8 nss)
@@ -316,9 +315,9 @@ s8 mt76_get_rate_power_limits(struct mt76_dev *dev,
 	val = mt76_get_of_array(np, "ofdm", &len, ARRAY_SIZE(dest->ofdm));
 	mt76_apply_array_limit(dest->ofdm, ARRAY_SIZE(dest->ofdm), val,
 			       target_power, txs_delta, &max_power);
+
 	val = mt76_get_of_array(np, "mcs", &len, mcs_rates + 1);
-	
-mt76_apply_multi_array_limit(dest->mcs[0], ARRAY_SIZE(dest->mcs[0]),
+	mt76_apply_multi_array_limit(dest->mcs[0], ARRAY_SIZE(dest->mcs[0]),
 				     ARRAY_SIZE(dest->mcs), val, len,
 				     target_power, txs_delta, &max_power);
 

@@ -19,6 +19,7 @@ mt7603_mcu_parse_response(struct mt76_dev *mdev, int cmd,
 {
 	struct mt7603_dev *dev = container_of(mdev, struct mt7603_dev, mt76);
 	struct mt7603_mcu_rxd *rxd;
+
 	if (!skb) {
 		dev_err(mdev->dev,
 			"MCU message %d (seq %d) timed out\n",

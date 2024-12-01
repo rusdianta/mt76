@@ -72,16 +72,10 @@ enum mt76_rxq_id {
 	__MT_RXQ_MAX
 };
 
-// struct mt76_queue_buf {
-// 	dma_addr_t addr;
-// 	int len;
-
-// };
-
 struct mt76_queue_buf {
 	dma_addr_t addr;
-	u16 len:15,
-	    skip_unmap:1;
+	u16 len;
+	bool skip_unmap;
 };
 
 struct mt76_tx_info {
@@ -285,7 +279,6 @@ struct mt76_tx_cb {
 
 enum {
 	MT76_STATE_INITIALIZED,
-	MT76_STATE_REGISTERED,
 	MT76_STATE_RUNNING,
 	MT76_STATE_MCU_RUNNING,
 	MT76_SCANNING,
@@ -300,7 +293,6 @@ enum {
 	MT76_STATE_SUSPEND,
 	MT76_STATE_ROC,
 	MT76_STATE_PM,
-	MT76_STATE_WED_RESET,
 };
 
 struct mt76_hw_cap {
@@ -385,12 +377,16 @@ struct mt76_rate_power {
 enum mt_vendor_req {
 	MT_VEND_DEV_MODE =	0x1,
 	MT_VEND_WRITE =		0x2,
+	MT_VEND_POWER_ON =	0x4,
 	MT_VEND_MULTI_WRITE =	0x6,
 	MT_VEND_MULTI_READ =	0x7,
 	MT_VEND_READ_EEPROM =	0x9,
 	MT_VEND_WRITE_FCE =	0x42,
 	MT_VEND_WRITE_CFG =	0x46,
 	MT_VEND_READ_CFG =	0x47,
+	MT_VEND_READ_EXT =	0x63,
+	MT_VEND_WRITE_EXT =	0x66,
+	MT_VEND_FEATURE_SET =	0x91,
 };
 
 enum mt76u_in_ep {
@@ -515,7 +511,6 @@ struct mt76_dev {
 	const struct mt76_driver_ops *drv;
 	const struct mt76_mcu_ops *mcu_ops;
 	struct device *dev;
-	struct device *dma_dev;
 
 	struct mt76_mcu mcu;
 
@@ -600,7 +595,7 @@ enum mt76_phy_type {
 	MT_PHY_TYPE_CCK,
 	MT_PHY_TYPE_OFDM,
 	MT_PHY_TYPE_HT,
-	MT_PHY_TYPE_HT_GF,	
+	MT_PHY_TYPE_HT_GF,
 	MT_PHY_TYPE_HE_SU = 8,
 	MT_PHY_TYPE_HE_EXT_SU,
 	MT_PHY_TYPE_HE_TB,
@@ -786,6 +781,7 @@ static inline bool mt76_is_skb_pktid(u8 pktid)
 static inline u8 mt76_tx_power_nss_delta(u8 nss)
 {
 	static const u8 nss_delta[4] = { 0, 6, 9, 12 };
+
 	return nss_delta[nss - 1];
 }
 
@@ -929,7 +925,6 @@ mt76_mcu_msg_alloc(struct mt76_dev *dev, const void *data,
 void mt76_mcu_rx_event(struct mt76_dev *dev, struct sk_buff *skb);
 struct sk_buff *mt76_mcu_get_response(struct mt76_dev *dev,
 				      unsigned long expires);
-
 int mt76_mcu_send_and_get_msg(struct mt76_dev *dev, int cmd, const void *data,
 			      int len, bool wait_resp, struct sk_buff **ret);
 int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
@@ -940,6 +935,7 @@ mt76_mcu_send_msg(struct mt76_dev *dev, int cmd, const void *data, int len,
 {
 	return mt76_mcu_send_and_get_msg(dev, cmd, data, len, wait_resp, NULL);
 }
+
 static inline int
 mt76_mcu_skb_send_msg(struct mt76_dev *dev, struct sk_buff *skb, int cmd,
 		      bool wait_resp)

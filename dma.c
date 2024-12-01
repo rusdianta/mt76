@@ -64,12 +64,14 @@ mt76_dma_add_buf(struct mt76_dev *dev, struct mt76_queue *q,
 
 		idx = q->head;
 		q->head = (q->head + 1) % q->ndesc;
+
 		desc = &q->desc[idx];
 		entry = &q->entry[idx];
 
 		if (buf[0].skip_unmap)
 			entry->skip_buf0 = true;
 		entry->skip_buf1 = i == nbufs - 1;
+
 		entry->dma_addr[0] = buf[0].addr;
 		entry->dma_len[0] = buf[0].len;
 
@@ -109,7 +111,7 @@ mt76_dma_tx_cleanup_idx(struct mt76_dev *dev, struct mt76_queue *q, int idx,
 	struct mt76_queue_entry *e = &q->entry[idx];
 
 	if (!e->skip_buf0)
-		dma_unmap_single(dev->dma_dev, e->dma_addr[0], e->dma_len[0],
+		dma_unmap_single(dev->dev, e->dma_addr[0], e->dma_len[0],
 				 DMA_TO_DEVICE);
 
 	if (!e->skip_buf1)

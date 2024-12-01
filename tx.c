@@ -100,6 +100,7 @@ mt76_tx_check_agg_ssn(struct ieee80211_sta *sta, struct sk_buff *skb)
 	mtxq = (struct mt76_txq *)txq->drv_priv;
 	if (!mtxq->aggr)
 		return;
+
 	mtxq->agg_ssn = le16_to_cpu(hdr->seq_ctrl) + 0x10;
 }
 EXPORT_SYMBOL_GPL(mt76_tx_check_agg_ssn);

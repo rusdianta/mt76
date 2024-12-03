@@ -96,9 +96,6 @@ struct dentry *mt76_register_debugfs(struct mt76_dev *dev)
 	struct dentry *dir;
 
 	dir = debugfs_create_dir("mt76", dev->hw->wiphy->debugfsdir);
-	if (!dir)
-		return NULL;
-
 	debugfs_create_u8("led_pin", 0600, dir, &dev->led_pin);
 	debugfs_create_bool("led_active_low", 0600, dir, &dev->led_al);
 	debugfs_create_u32("regidx", 0600, dir, &dev->debugfs_reg);

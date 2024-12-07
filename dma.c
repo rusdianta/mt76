@@ -64,10 +64,12 @@ mt76_dma_add_buf(struct mt76_dev *dev, struct mt76_queue *q,
 
 		idx = q->head;
 		q->head = (q->head + 1) % q->ndesc;
-
 		desc = &q->desc[idx];
-		entry = &q->entry[idx];		
+		entry = &q->entry[idx];
 
+		if (buf[0].skip_unmap)
+			entry->skip_buf0 = true;
+		entry->skip_buf1 = i == nbufs - 1;
 		entry->dma_addr[0] = buf[0].addr;
 		entry->dma_len[0] = buf[0].len;
 
@@ -77,6 +79,8 @@ mt76_dma_add_buf(struct mt76_dev *dev, struct mt76_queue *q,
 			entry->dma_len[1] = buf[1].len;
 			buf1 = buf[1].addr;
 			ctrl |= FIELD_PREP(MT_DMA_CTL_SD_LEN1, buf[1].len);
+			if (buf[1].skip_unmap)
+				entry->skip_buf1 = true;
 		}
 
 		if (i == nbufs - 1)
@@ -94,6 +98,7 @@ mt76_dma_add_buf(struct mt76_dev *dev, struct mt76_queue *q,
 
 	q->entry[idx].txwi = txwi;
 	q->entry[idx].skb = skb;
+	q->entry[idx].wcid = 0xffff;
 
 	return idx;
 }
@@ -106,7 +111,7 @@ mt76_dma_tx_cleanup_idx(struct mt76_dev *dev, struct mt76_queue *q, int idx,
 
 	if (!e->skip_buf0)
 		dma_unmap_single(dev->dev, e->dma_addr[0], e->dma_len[0],
-				 DMA_TO_DEVICE);
+			DMA_TO_DEVICE);
 
 	if (!e->skip_buf1)
 		dma_unmap_single(dev->dev, e->dma_addr[1], e->dma_len[1],
@@ -166,7 +171,7 @@ mt76_dma_tx_cleanup(struct mt76_dev *dev, enum mt76_txq_id qid, bool flush)
 		n_queued++;
 
 		if (entry.skb)
-			dev->drv->tx_complete_skb(dev, &entry);
+			dev->drv->tx_complete_skb(dev, qid, &entry);
 
 		if (entry.txwi) {
 			if (!(dev->drv->drv_flags & MT_DRV_TXWI_NO_FREE))
@@ -295,7 +300,6 @@ mt76_dma_tx_queue_skb(struct mt76_dev *dev, enum mt76_txq_id qid,
 		.skb = skb,
 	};
 	int len, n = 0, ret = -ENOMEM;
-	struct mt76_queue_entry e;
 	struct mt76_txwi_cache *t;
 	struct sk_buff *iter;
 	dma_addr_t addr;
@@ -336,6 +340,11 @@ mt76_dma_tx_queue_skb(struct mt76_dev *dev, enum mt76_txq_id qid,
 	}
 	tx_info.nbuf = n;
 
+	if (q->queued + (tx_info.nbuf + 1) / 2 >= q->ndesc - 1) {
+		ret = -ENOMEM;
+		goto unmap;
+	}
+
 	dma_sync_single_for_cpu(dev->dev, t->dma_addr, dev->drv->txwi_size,
 				DMA_TO_DEVICE);
 	ret = dev->drv->tx_prepare_skb(dev, txwi, qid, wcid, sta, &tx_info);
@@ -343,11 +352,6 @@ mt76_dma_tx_queue_skb(struct mt76_dev *dev, enum mt76_txq_id qid,
 				   DMA_TO_DEVICE);
 	if (ret < 0)
 		goto unmap;
-
-	if (q->queued + (tx_info.nbuf + 1) / 2 >= q->ndesc - 1) {
-		ret = -ENOMEM;
-		goto unmap;
-	}
 
 	return mt76_dma_add_buf(dev, q, tx_info.buf, tx_info.nbuf,
 				tx_info.info, tx_info.skb, t);
@@ -358,9 +362,7 @@ unmap:
 				 tx_info.buf[n].len, DMA_TO_DEVICE);
 
 free:
-	e.skb = tx_info.skb;
-	e.txwi = t;
-	dev->drv->tx_complete_skb(dev, &e);
+	dev_kfree_skb(tx_info.skb);
 	mt76_put_txwi(dev, t);
 	return ret;
 }
@@ -391,6 +393,7 @@ mt76_dma_rx_fill(struct mt76_dev *dev, struct mt76_queue *q)
 
 		qbuf.addr = addr + offset;
 		qbuf.len = len - offset;
+		qbuf.skip_unmap = false;
 		mt76_dma_add_buf(dev, q, &qbuf, 1, 0, buf, NULL);
 		frames++;
 	}
@@ -409,15 +412,24 @@ mt76_dma_rx_cleanup(struct mt76_dev *dev, struct mt76_queue *q)
 	struct page *page;
 	void *buf;
 	bool more;
-
-	spin_lock_bh(&q->lock);
+	
 	do {
+		spin_lock_bh(&q->lock);
 		buf = mt76_dma_dequeue(dev, q, true, NULL, NULL, &more);
+		spin_unlock_bh(&q->lock);
+
 		if (!buf)
 			break;
 
 		skb_free_frag(buf);
 	} while (1);
+
+	spin_lock_bh(&q->lock);
+	if (q->rx_head) {
+		dev_kfree_skb(q->rx_head);
+		q->rx_head = NULL;
+	}
+
 	spin_unlock_bh(&q->lock);
 
 	if (!q->rx_page.va)
@@ -440,28 +452,23 @@ mt76_dma_rx_reset(struct mt76_dev *dev, enum mt76_rxq_id qid)
 	mt76_dma_rx_cleanup(dev, q);
 	mt76_dma_sync_idx(dev, q);
 	mt76_dma_rx_fill(dev, q);
-
-	if (!q->rx_head)
-		return;
-
-	dev_kfree_skb(q->rx_head);
-	q->rx_head = NULL;
 }
 
 static void
 mt76_add_fragment(struct mt76_dev *dev, struct mt76_queue *q, void *data,
 		  int len, bool more)
 {
-	struct page *page = virt_to_head_page(data);
-	int offset = data - page_address(page);
 	struct sk_buff *skb = q->rx_head;
 	struct skb_shared_info *shinfo = skb_shinfo(skb);
 	int nr_frags = shinfo->nr_frags;
 
 	if (nr_frags < ARRAY_SIZE(shinfo->frags)) {
-		offset += q->buf_offset;
-		skb_add_rx_frag(skb, shinfo->nr_frags, page, offset, len,
-				q->buf_size);
+		struct page *page = virt_to_head_page(data);
+		int offset = data - page_address(page) + q->buf_offset;
+
+		skb_add_rx_frag(skb, nr_frags, page, offset, len, q->buf_size);
+	} else {
+		skb_free_frag(data);
 	}
 
 	if (more)
@@ -497,9 +504,7 @@ mt76_dma_rx_process(struct mt76_dev *dev, struct mt76_queue *q, int budget)
 		if (data_len < len + q->buf_offset) {
 			dev_kfree_skb(q->rx_head);
 			q->rx_head = NULL;
-
-			skb_free_frag(data);
-			continue;
+			goto free_frag;
 		}
 
 		if (q->rx_head) {
@@ -507,17 +512,17 @@ mt76_dma_rx_process(struct mt76_dev *dev, struct mt76_queue *q, int budget)
 			continue;
 		}
 
+		if (!more && dev->drv->rx_check &&
+		    !(dev->drv->rx_check(dev, data, len)))
+			goto free_frag;
+
 		skb = build_skb(data, q->buf_size);
-		if (!skb) {
-			skb_free_frag(data);
-			continue;
-		}
+		if (!skb)
+			goto free_frag;
+
 		skb_reserve(skb, q->buf_offset);
 
-		if (q == &dev->q_rx[MT_RXQ_MCU]) {
-			u32 *rxfce = (u32 *)skb->cb;
-			*rxfce = info;
-		}
+		*(u32 *)skb->cb = info;
 
 		__skb_put(skb, len);
 		done++;
@@ -528,6 +533,9 @@ mt76_dma_rx_process(struct mt76_dev *dev, struct mt76_queue *q, int budget)
 		}
 
 		dev->drv->rx_skb(dev, q - dev->q_rx, skb);
+		continue;
+free_frag:
+		skb_free_frag(data);
 	}
 
 	mt76_dma_rx_fill(dev, q);

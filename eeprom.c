@@ -16,6 +16,7 @@ mt76_get_of_eeprom(struct mt76_dev *dev, int len)
 	struct device_node *np = dev->dev->of_node;
 	struct mtd_info *mtd;
 	const __be32 *list;
+	const void *data;
 	const char *part;
 	phandle phandle;
 	int offset = 0;
@@ -25,6 +26,14 @@ mt76_get_of_eeprom(struct mt76_dev *dev, int len)
 
 	if (!np)
 		return -ENOENT;
+
+	data = of_get_property(np, "mediatek,eeprom-data", &size);
+	if (data) {
+		if (size > len)
+			return -EINVAL;
+		memcpy(eep, data, size);
+		return 0;
+	}
 
 	list = of_get_property(np, "mediatek,mtd-eeprom", &size);
 	if (!list)
@@ -56,6 +65,8 @@ mt76_get_of_eeprom(struct mt76_dev *dev, int len)
 	offset += be32_to_cpup(list);
 	ret = mtd_read(mtd, offset, len, &retlen, dev->eeprom.data);
 	put_mtd_device(mtd);
+	if (mtd_is_bitflip(ret))
+		ret = 0;
 	if (ret) {
 		dev_err(dev->dev, "reading EEPROM from mtd %s failed: %i\n",
 			part, ret);
@@ -306,22 +317,22 @@ s8 mt76_get_rate_power_limits(struct mt76_dev *dev,
 	np = mt76_find_channel_node(np, chan);
 	if (!np)
 		return target_power;
-	txs_delta = mt76_get_txs_delta(np, hweight8(dev->antenna_mask));
+	txs_delta = mt76_get_txs_delta(np, hweight16(dev->chainmask));
 
-	val = mt76_get_of_array(np, "cck", &len, ARRAY_SIZE(dest->cck));
+	val = mt76_get_of_array(np, "rates-cck", &len, ARRAY_SIZE(dest->cck));
 	mt76_apply_array_limit(dest->cck, ARRAY_SIZE(dest->cck), val,
 			       target_power, txs_delta, &max_power);
 
-	val = mt76_get_of_array(np, "ofdm", &len, ARRAY_SIZE(dest->ofdm));
+	val = mt76_get_of_array(np, "rates-ofdm", &len, ARRAY_SIZE(dest->ofdm));
 	mt76_apply_array_limit(dest->ofdm, ARRAY_SIZE(dest->ofdm), val,
 			       target_power, txs_delta, &max_power);
 
-	val = mt76_get_of_array(np, "mcs", &len, mcs_rates + 1);
+	val = mt76_get_of_array(np, "rates-mcs", &len, mcs_rates + 1);
 	mt76_apply_multi_array_limit(dest->mcs[0], ARRAY_SIZE(dest->mcs[0]),
 				     ARRAY_SIZE(dest->mcs), val, len,
 				     target_power, txs_delta, &max_power);
 
-	val = mt76_get_of_array(np, "ru", &len, ru_rates + 1);
+	val = mt76_get_of_array(np, "rates-ru", &len, ru_rates + 1);
 	mt76_apply_multi_array_limit(dest->ru[0], ARRAY_SIZE(dest->ru[0]),
 				     ARRAY_SIZE(dest->ru), val, len,
 				     target_power, txs_delta, &max_power);

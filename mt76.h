@@ -21,6 +21,42 @@
 #define MT_RX_BUF_SIZE      2048
 #define MT_SKB_HEAD_LEN     128
 
+enum mac80211_rx_flags_lk4_14_275 {
+	// RX_FLAG_MMIC_ERROR		= BIT(0),
+	// RX_FLAG_DECRYPTED		= BIT(1),
+	// RX_FLAG_ONLY_MONITOR		= BIT(2),
+	// RX_FLAG_MMIC_STRIPPED		= BIT(3),
+	// RX_FLAG_IV_STRIPPED		= BIT(4),
+	// RX_FLAG_FAILED_FCS_CRC		= BIT(5),
+	// RX_FLAG_FAILED_PLCP_CRC 	= BIT(6),
+	// RX_FLAG_MACTIME_IS_RTAP_TS64	= BIT(7),
+	// RX_FLAG_NO_SIGNAL_VAL		= BIT(8),
+	// RX_FLAG_AMPDU_DETAILS		= BIT(9),
+	// RX_FLAG_PN_VALIDATED		= BIT(10),
+	// RX_FLAG_DUP_VALIDATED		= BIT(11),
+	// RX_FLAG_AMPDU_LAST_KNOWN	= BIT(12),
+	// RX_FLAG_AMPDU_IS_LAST		= BIT(13),
+	// RX_FLAG_AMPDU_DELIM_CRC_ERROR	= BIT(14),
+	/* one free bit at 15 */
+	// RX_FLAG_MACTIME			= BIT(16) | BIT(17),
+	// RX_FLAG_MACTIME_PLCP_START	= 1 << 16,
+	// RX_FLAG_MACTIME_START		= 2 << 16,
+	// RX_FLAG_MACTIME_END		= 3 << 16,
+	// RX_FLAG_SKIP_MONITOR		= BIT(18),
+	// RX_FLAG_AMSDU_MORE		= BIT(19),
+	// RX_FLAG_RADIOTAP_TLV_AT_END	= BIT(20),
+	// RX_FLAG_MIC_STRIPPED		= BIT(21),
+	// RX_FLAG_ALLOW_SAME_PN		= BIT(22),
+	// RX_FLAG_ICV_STRIPPED		= BIT(23),
+	// RX_FLAG_AMPDU_EOF_BIT		= BIT(24),
+	// RX_FLAG_AMPDU_EOF_BIT_KNOWN	= BIT(25),
+	// RX_FLAG_RADIOTAP_HE		= BIT(26),
+	// RX_FLAG_RADIOTAP_HE_MU		= BIT(27),
+	// RX_FLAG_RADIOTAP_LSIG		= BIT(28),
+	// RX_FLAG_NO_PSDU			= BIT(29),
+	RX_FLAG_8023			= BIT(30),
+};
+
 struct mt76_dev;
 struct mt76_wcid;
 
@@ -75,6 +111,7 @@ enum mt76_rxq_id {
 struct mt76_queue_buf {
 	dma_addr_t addr;
 	u16 len;
+	bool skip_unmap;
 };
 
 struct mt76_tx_info {
@@ -135,6 +172,7 @@ struct mt76_queue {
 struct mt76_sw_queue {
 	struct mt76_queue *q;
 
+struct list_head swq;
 	int swq_queued;
 };
 
@@ -187,9 +225,6 @@ enum mt76_wcid_flags {
 
 #define MT76_N_WCIDS 288
 
-/* stored in ieee80211_tx_info::hw_queue */
-#define MT_TX_HW_QUEUE_EXT_PHY		BIT(3)
-
 DECLARE_EWMA(signal, 10, 8);
 
 #define MT_WCID_TX_INFO_RATE		GENMASK(15, 0)
@@ -236,6 +271,7 @@ struct mt76_txwi_cache {
 	dma_addr_t dma_addr;
 
 	struct sk_buff *skb;
+	//struct list_head list;
 };
 
 struct mt76_rx_tid {
@@ -261,8 +297,8 @@ struct mt76_rx_tid {
 #define MT_TX_CB_TXS_DONE		BIT(1)
 #define MT_TX_CB_TXS_FAILED		BIT(2)
 
-#define MT_PACKET_ID_MASK		GENMASK(6, 0)
-#define MT_PACKET_ID_NO_ACK		0
+#define MT_PACKET_ID_MASK		GENMASK(6, 0) // GENMASK(7, 0)
+#define MT_PACKET_ID_NO_ACK		0		// MT_PACKET_ID_MASK
 #define MT_PACKET_ID_NO_SKB		1
 #define MT_PACKET_ID_FIRST		2
 #define MT_PACKET_ID_HAS_RATE		BIT(7)
@@ -303,6 +339,14 @@ struct mt76_driver_ops {
 	u16 txwi_size;
 	u8 mcs_rates;
 
+	//int (*fill_txwi)(struct mt76_dev *dev, void *txwi_ptr,
+	//		 struct sk_buff *skb, struct mt76_wcid *wcid,
+	//		 struct ieee80211_sta *sta);
+
+	//int (*tx_queue_skb)(struct mt76_dev *dev, struct mt76_queue *q,
+	//struct sk_buff *skb, struct mt76_txwi_cache *txwi,
+	//		    struct mt76_wcid *wcid, struct ieee80211_sta *sta);
+
 	void (*update_survey)(struct mt76_dev *dev);
 
 	int (*tx_prepare_skb)(struct mt76_dev *dev, void *txwi_ptr,
@@ -310,10 +354,12 @@ struct mt76_driver_ops {
 			      struct ieee80211_sta *sta,
 			      struct mt76_tx_info *tx_info);
 
-	void (*tx_complete_skb)(struct mt76_dev *dev,
+	void (*tx_complete_skb)(struct mt76_dev *dev, enum mt76_txq_id qid,
 				struct mt76_queue_entry *e);
 
 	bool (*tx_status_data)(struct mt76_dev *dev, u8 *update);
+
+	bool (*rx_check)(struct mt76_dev *dev, void *data, int len);
 
 	void (*rx_skb)(struct mt76_dev *dev, enum mt76_rxq_id q,
 		       struct sk_buff *skb);
@@ -650,7 +696,6 @@ static inline u16 mt76_rev(struct mt76_dev *dev)
 #define mt76_init_queues(dev)		(dev)->mt76.queue_ops->init(&((dev)->mt76))
 #define mt76_queue_alloc(dev, ...)	(dev)->mt76.queue_ops->alloc(&((dev)->mt76), __VA_ARGS__)
 #define mt76_tx_queue_skb_raw(dev, ...)	(dev)->mt76.queue_ops->tx_queue_skb_raw(&((dev)->mt76), __VA_ARGS__)
-#define mt76_tx_queue_skb(dev, ...)	(dev)->mt76.queue_ops->tx_queue_skb(&((dev)->mt76), __VA_ARGS__)
 #define mt76_queue_rx_reset(dev, ...)	(dev)->mt76.queue_ops->rx_reset(&((dev)->mt76), __VA_ARGS__)
 #define mt76_queue_tx_cleanup(dev, ...)	(dev)->mt76.queue_ops->tx_cleanup(&((dev)->mt76), __VA_ARGS__)
 #define mt76_queue_kick(dev, ...)	(dev)->mt76.queue_ops->kick(&((dev)->mt76), __VA_ARGS__)
@@ -721,6 +766,17 @@ static inline struct mt76_tx_cb *mt76_tx_skb_cb(struct sk_buff *skb)
 	return ((void *)IEEE80211_SKB_CB(skb)->status.status_driver_data);
 }
 
+static inline void mt76_insert_hdr_pad(struct sk_buff *skb)
+{
+	int len = ieee80211_get_hdrlen_from_skb(skb);
+	if (len % 4 == 0)
+		return;
+	skb_push(skb, 2);
+	memmove(skb->data, skb->data + 2, len);
+	skb->data[len] = 0;
+	skb->data[len + 1] = 0;
+}
+
 static inline void *mt76_skb_get_hdr(struct sk_buff *skb)
 {
 	struct mt76_rx_status mstat;
@@ -738,20 +794,6 @@ static inline void *mt76_skb_get_hdr(struct sk_buff *skb)
 		data += sizeof(struct ieee80211_radiotap_he_mu);
 
 	return data;
-}
-
-static inline void mt76_insert_hdr_pad(struct sk_buff *skb)
-{
-	int len = ieee80211_get_hdrlen_from_skb(skb);
-
-	if (len % 4 == 0)
-		return;
-
-	skb_push(skb, 2);
-	memmove(skb->data, skb->data + 2, len);
-
-	skb->data[len] = 0;
-	skb->data[len + 1] = 0;
 }
 
 static inline bool mt76_is_skb_pktid(u8 pktid)

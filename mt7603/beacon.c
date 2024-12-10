@@ -139,6 +139,8 @@ out:
 	if (dev->mt76.q_tx[MT_TXQ_BEACON].q->queued >
 	    hweight8(dev->mt76.beacon_mask))
 		dev->beacon_check++;
+
+		// hweight8(dev->beacon_mask))
 }
 
 void mt7603_beacon_set_timer(struct mt7603_dev *dev, int idx, int intval)

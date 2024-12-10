@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: ISC
+/* SPDX-License-Identifier: ISC */
 
 #include "mt7603.h"
 
@@ -27,7 +27,7 @@ irqreturn_t mt7603_irq_handler(int irq, void *dev_instance)
 
 		mt76_wr(dev, MT_HW_INT_STATUS(3), hwintr);
 		if (hwintr & MT_HW_INT3_PRE_TBTT0)
-			tasklet_schedule(&dev->mt76.pre_tbtt_tasklet);
+			tasklet_schedule(&dev->pre_tbtt_tasklet);
 
 		if ((hwintr & MT_HW_INT3_TBTT0) && dev->mt76.csa_complete)
 			mt76_csa_finish(&dev->mt76);
@@ -35,7 +35,7 @@ irqreturn_t mt7603_irq_handler(int irq, void *dev_instance)
 
 	if (intr & MT_INT_TX_DONE_ALL) {
 		mt7603_irq_disable(dev, MT_INT_TX_DONE_ALL);
-		napi_schedule(&dev->mt76.tx_napi);
+		tasklet_schedule(&dev->tx_tasklet);
 	}
 
 	if (intr & MT_INT_RX_DONE(0)) {
@@ -53,8 +53,8 @@ irqreturn_t mt7603_irq_handler(int irq, void *dev_instance)
 
 u32 mt7603_reg_map(struct mt7603_dev *dev, u32 addr)
 {
-	u32 base = addr & MT_MCU_PCIE_REMAP_2_BASE;
-	u32 offset = addr & MT_MCU_PCIE_REMAP_2_OFFSET;
+	u32 base = addr & GENMASK(31, 19);
+	u32 offset = addr & GENMASK(18, 0);
 
 	dev->bus_ops->wr(&dev->mt76, MT_MCU_PCIE_REMAP_2, base);
 

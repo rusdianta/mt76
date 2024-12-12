@@ -480,7 +480,7 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 		return ret;
 
 	WARN_ON(mt76_worker_setup(hw, &dev->tx_worker, NULL, "tx"));
-	sched_set_fifo_low(dev->tx_worker.task);
+	sched_set_fifo_low_dev(dev->tx_worker.task);
 
 	return 0;
 }

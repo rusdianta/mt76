@@ -1161,8 +1161,8 @@ int mt76u_init(struct mt76_dev *dev,
 	if (err)
 		return err;
 
-	sched_set_fifo_low(usb->rx_worker.task);
-	sched_set_fifo_low(usb->status_worker.task);
+	sched_set_fifo_low_dev(usb->rx_worker.task);
+	sched_set_fifo_low_dev(usb->status_worker.task);
 
 	return 0;
 }

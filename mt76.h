@@ -17,7 +17,7 @@
 #include "util.h"
 #include "testmode.h"
 
-enum nl80211_ext_feature_index_alt {	
+enum nl80211_ext_feature_index_dev {	
 	NL80211_EXT_FEATURE_AQL = 40
 };
 
@@ -1204,5 +1204,15 @@ s8 mt76_get_rate_power_limits(struct mt76_phy *phy,
 			      struct ieee80211_channel *chan,
 			      struct mt76_power_limits *dest,
 			      s8 target_power);
+
+/*
+ * For when you don't much care about FIFO, but want to be above SCHED_NORMAL.
+ */
+void sched_set_fifo_low_dev(struct task_struct *p)
+{
+	struct sched_param sp = { .sched_priority = 1 };
+	WARN_ON_ONCE(sched_setscheduler_nocheck(p, SCHED_FIFO, &sp) != 0);
+}
+EXPORT_SYMBOL_GPL(sched_set_fifo_low_dev);
 
 #endif

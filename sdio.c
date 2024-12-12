@@ -357,8 +357,8 @@ int mt76s_init(struct mt76_dev *dev, struct sdio_func *func,
 	if (err)
 		return err;
 
-	sched_set_fifo_low(sdio->status_worker.task);
-	sched_set_fifo_low(sdio->net_worker.task);
+	sched_set_fifo_low_dev(sdio->status_worker.task);
+	sched_set_fifo_low_dev(sdio->net_worker.task);
 
 	INIT_WORK(&sdio->stat_work, mt76s_tx_status_data);
 

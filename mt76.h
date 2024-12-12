@@ -13,6 +13,7 @@
 #include <linux/leds.h>
 #include <linux/usb.h>
 #include <linux/average.h>
+#include <linux/sched/types.h>
 #include <net/mac80211.h>
 #include "util.h"
 #include "testmode.h"

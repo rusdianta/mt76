@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: ISC
+/* SPDX-License-Identifier: ISC */
 
 #include "mt7603.h"
 #include "mac.h"
@@ -30,16 +30,6 @@ mt7603_init_tx_queue(struct mt7603_dev *dev, struct mt76_sw_queue *q,
 static void
 mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
 {
-	static const u8 tid_to_ac[8] = {
-		IEEE80211_AC_BE,
-		IEEE80211_AC_BK,
-		IEEE80211_AC_BK,
-		IEEE80211_AC_BE,
-		IEEE80211_AC_VI,
-		IEEE80211_AC_VI,
-		IEEE80211_AC_VO,
-		IEEE80211_AC_VO
-	};
 	__le32 *txd = (__le32 *)skb->data;
 	struct ieee80211_hdr *hdr;
 	struct ieee80211_sta *sta;
@@ -48,7 +38,7 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
 	void *priv;
 	int idx;
 	u32 val;
-	u8 tid = 0;
+	u8 tid;
 
 	if (skb->len < MT_TXD_SIZE + sizeof(struct ieee80211_hdr))
 		goto free;
@@ -66,16 +56,15 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
 
 	priv = msta = container_of(wcid, struct mt7603_sta, wcid);
 	val = le32_to_cpu(txd[0]);
+	skb_set_queue_mapping(skb, FIELD_GET(MT_TXD0_Q_IDX, val));
+
 	val &= ~(MT_TXD0_P_IDX | MT_TXD0_Q_IDX);
 	val |= FIELD_PREP(MT_TXD0_Q_IDX, MT_TX_HW_QUEUE_MGMT);
 	txd[0] = cpu_to_le32(val);
 
 	sta = container_of(priv, struct ieee80211_sta, drv_priv);
-	hdr = (struct ieee80211_hdr *)&skb->data[MT_TXD_SIZE];
-	if (ieee80211_is_data_qos(hdr->frame_control))
-		tid = *ieee80211_get_qos_ctl(hdr) &
-		      IEEE80211_QOS_CTL_TAG1D_MASK;
-	skb_set_queue_mapping(skb, tid_to_ac[tid]);
+	hdr = (struct ieee80211_hdr *) &skb->data[MT_TXD_SIZE];
+	tid = *ieee80211_get_qos_ctl(hdr) & IEEE80211_QOS_CTL_TID_MASK;
 	ieee80211_sta_set_buffered(sta, tid, true);
 
 	spin_lock_bh(&dev->ps_lock);
@@ -146,28 +135,19 @@ mt7603_init_rx_queue(struct mt7603_dev *dev, struct mt76_queue *q,
 	return 0;
 }
 
-static int mt7603_poll_tx(struct napi_struct *napi, int budget)
+static void
+mt7603_tx_tasklet(unsigned long data)
 {
-	struct mt7603_dev *dev;
+	struct mt7603_dev *dev = (struct mt7603_dev *)data;
 	int i;
 
-	dev = container_of(napi, struct mt7603_dev, mt76.tx_napi);
 	dev->tx_dma_check = 0;
-
 	for (i = MT_TXQ_MCU; i >= 0; i--)
 		mt76_queue_tx_cleanup(dev, i, false);
 
-	if (napi_complete_done(napi, 0))
-		mt7603_irq_enable(dev, MT_INT_TX_DONE_ALL);
+	mt76_txq_schedule_all(&dev->mt76);
 
-	for (i = MT_TXQ_MCU; i >= 0; i--)
-		mt76_queue_tx_cleanup(dev, i, false);
-
-	mt7603_mac_sta_poll(dev);
-
-	tasklet_schedule(&dev->mt76.tx_tasklet);
-
-	return 0;
+	mt7603_irq_enable(dev, MT_INT_TX_DONE_ALL);
 }
 
 int mt7603_dma_init(struct mt7603_dev *dev)
@@ -182,6 +162,11 @@ int mt7603_dma_init(struct mt7603_dev *dev)
 	int i;
 
 	mt76_dma_attach(&dev->mt76);
+
+	init_waitqueue_head(&dev->mt76.mmio.mcu.wait);
+	skb_queue_head_init(&dev->mt76.mmio.mcu.res_q);
+
+	tasklet_init(&dev->mt76.tx_tasklet, mt7603_tx_tasklet, (unsigned long)dev);
 
 	mt76_clear(dev, MT_WPDMA_GLO_CFG,
 		   MT_WPDMA_GLO_CFG_TX_DMA_EN |
@@ -221,7 +206,7 @@ int mt7603_dma_init(struct mt7603_dev *dev)
 		return ret;
 
 	ret = mt7603_init_rx_queue(dev, &dev->mt76.q_rx[MT_RXQ_MCU], 1,
-				   MT7603_MCU_RX_RING_SIZE, MT_RX_BUF_SIZE);
+				   MT_MCU_RING_SIZE, MT_RX_BUF_SIZE);
 	if (ret)
 		return ret;
 
@@ -231,15 +216,7 @@ int mt7603_dma_init(struct mt7603_dev *dev)
 		return ret;
 
 	mt76_wr(dev, MT_DELAY_INT_CFG, 0);
-	ret = mt76_init_queues(dev);
-	if (ret)
-		return ret;
-
-	netif_tx_napi_add(&dev->mt76.napi_dev, &dev->mt76.tx_napi,
-			  mt7603_poll_tx, NAPI_POLL_WEIGHT);
-	napi_enable(&dev->mt76.tx_napi);
-
-	return 0;
+	return mt76_init_queues(dev);
 }
 
 void mt7603_dma_cleanup(struct mt7603_dev *dev)

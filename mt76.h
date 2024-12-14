@@ -251,6 +251,7 @@ struct mt76_rx_tid {
 #define MT_PACKET_ID_NO_ACK		0
 #define MT_PACKET_ID_NO_SKB		1
 #define MT_PACKET_ID_FIRST		2
+#define MT_PACKET_ID_HAS_RATE		BIT(7)
 
 #define MT_TX_STATUS_SKB_TIMEOUT	HZ
 

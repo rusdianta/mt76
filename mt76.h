@@ -71,6 +71,10 @@ enum mt76_rxq_id {
 	__MT_RXQ_MAX
 };
 
+enum nl80211_ext_feature_index_dev {	
+	NL80211_EXT_FEATURE_AQL = 40,
+};
+
 struct mt76_queue_buf {
 	dma_addr_t addr;
 	int len;

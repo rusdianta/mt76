@@ -925,8 +925,7 @@ EXPORT_SYMBOL_GPL(mt76_sta_state);
 void mt76_sta_pre_rcu_remove(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			     struct ieee80211_sta *sta)
 {
-	struct mt76_phy *phy = hw->priv;
-	struct mt76_dev *dev = phy->dev;
+	struct mt76_dev *dev = hw->priv;
 	struct mt76_wcid *wcid = (struct mt76_wcid *)sta->drv_priv;
 
 	mutex_lock(&dev->mutex);

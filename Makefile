@@ -11,3 +11,6 @@ mt76-y := \
 mt76-$(CONFIG_PCI) += pci.o
 
 mt76-usb-y := usb.o usb_trace.o
+
+CFLAGS_trace.o := -I$(src)
+CFLAGS_usb_trace.o := -I$(src)

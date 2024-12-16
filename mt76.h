@@ -75,6 +75,10 @@ enum nl80211_ext_feature_index_dev {
 	NL80211_EXT_FEATURE_AQL = 40,
 };
 
+enum mac80211_tx_info_flags_dev {	
+	IEEE80211_TX_CTL_HW_80211_ENCAP		= BIT(14),
+};
+
 struct mt76_queue_buf {
 	dma_addr_t addr;
 	u16 len;

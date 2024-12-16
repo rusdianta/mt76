@@ -10,7 +10,7 @@
 #include <linux/skbuff.h>
 #include <linux/bitops.h>
 #include <linux/bitfield.h>
-#include <linux/khtread.h>
+#include <linux/kthread.h>
 #include <net/mac80211.h>
 
 struct mt76_worker

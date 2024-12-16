@@ -591,7 +591,7 @@ mt7603_mac_fill_rx(struct mt7603_dev *dev, struct sk_buff *skb)
 		switch (FIELD_GET(MT_RXV1_TX_MODE, rxdg0)) {
 		case MT_PHY_TYPE_CCK:
 			cck = true;
-			fallthrough;
+			/* fall through */
 		case MT_PHY_TYPE_OFDM:
 			i = mt76_get_rate(&dev->mt76, sband, i, cck);
 			break;
@@ -1162,7 +1162,7 @@ out:
 	switch (FIELD_GET(MT_TX_RATE_MODE, final_rate)) {
 	case MT_PHY_TYPE_CCK:
 		cck = true;
-		fallthrough;
+		/* fall through */
 	case MT_PHY_TYPE_OFDM:
 		if (dev->mt76.chandef.chan->band == NL80211_BAND_5GHZ)
 			sband = &dev->mt76.sband_5g.sband;

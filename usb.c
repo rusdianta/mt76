@@ -616,7 +616,7 @@ static void mt76u_complete_rx(struct urb *urb)
 	default:
 		dev_err_ratelimited(dev->dev, "rx urb failed: %d\n",
 				    urb->status);
-		fallthrough;
+		/* fall through */
 	case 0:
 		break;
 	}

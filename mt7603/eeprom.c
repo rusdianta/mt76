@@ -141,7 +141,6 @@ static int mt7603_check_eeprom(struct mt76_dev *dev)
 	switch (val) {
 	case 0x7628:
 	case 0x7603:
-	case 0x7600:
 		return 0;
 	default:
 		return -EINVAL;

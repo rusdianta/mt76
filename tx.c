@@ -399,6 +399,7 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 	struct mt76_wcid *wcid;
 	int ret = 0;
 
+	spin_lock_bh(&hwq->lock);
 	while (1) {
 		if (sq->swq_queued >= 4)
 			break;
@@ -418,8 +419,6 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 		if (wcid && test_bit(MT_WCID_FLAG_PS, &wcid->flags))
 			continue;
 
-		spin_lock_bh(&hwq->lock);	
-
 		if (mtxq->send_bar && mtxq->aggr) {
 			struct ieee80211_txq *txq = mtxq_to_txq(mtxq);
 			struct ieee80211_sta *sta = txq->sta;
@@ -433,12 +432,11 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 			spin_lock_bh(&hwq->lock);
 		}
 
-		spin_unlock_bh(&hwq->lock);
-
 		ret += mt76_txq_send_burst(dev, sq, mtxq);
 		ieee80211_return_txq(dev->hw, txq,
 				     !skb_queue_empty(&mtxq->retry_q));
 	}
+	spin_unlock_bh(&hwq->lock);
 
 	return ret;
 }

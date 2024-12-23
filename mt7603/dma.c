@@ -203,6 +203,10 @@ int mt7603_dma_init(struct mt7603_dev *dev)
 	ret = mt7603_init_tx_queue(dev, &dev->mt76.q_tx[MT_TXQ_PSD],
 				   MT_TX_HW_QUEUE_MGMT, MT7603_PSD_RING_SIZE);
 	if (ret)
+		return ret;
+
+	ret = mt7603_init_tx_queue(dev, &dev->mt76.q_tx[MT_TXQ_MCU],
+				   MT_TX_HW_QUEUE_MCU, MT_MCU_RING_SIZE);
 	if (ret)
 		return ret;
 

@@ -548,7 +548,7 @@ int mt7603_register_device(struct mt7603_dev *dev)
 	if (FIELD_GET(MT_EE_NIC_CONF_0_RX_PATH, eeprom[MT_EE_NIC_CONF_0]) == 1 ||
 	    FIELD_GET(MT_EE_NIC_CONF_0_TX_PATH, eeprom[MT_EE_NIC_CONF_0]) == 1 ||
 	    is_mt7688(dev))
-		dev->mphy.antenna_mask = 1;
+		dev->mt76.antenna_mask = 1;
 
 	dev->slottime = 9;
 	dev->sensitivity_limit = 28;

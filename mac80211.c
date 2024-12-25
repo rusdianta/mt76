@@ -353,8 +353,6 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 	ieee80211_hw_set(hw, SUPPORT_FAST_XMIT);
 	ieee80211_hw_set(hw, SUPPORTS_CLONED_SKBS);
 	ieee80211_hw_set(hw, SUPPORTS_AMSDU_IN_AMPDU);
-	ieee80211_hw_set(hw, SUPPORTS_REORDERING_BUFFER);
-
 	if (!(dev->drv->drv_flags & MT_DRV_AMSDU_OFFLOAD)) {
 		ieee80211_hw_set(hw, TX_AMSDU);
 		ieee80211_hw_set(hw, TX_FRAG_LIST);
@@ -362,6 +360,8 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 	ieee80211_hw_set(hw, MFP_CAPABLE);
 	ieee80211_hw_set(hw, AP_LINK_PS);
 	ieee80211_hw_set(hw, REPORTS_TX_ACK_STATUS);
+	ieee80211_hw_set(hw, NEEDS_UNIQUE_STA_ADDR);
+	ieee80211_hw_set(hw, SUPPORTS_REORDERING_BUFFER);
 
 	wiphy->flags |= WIPHY_FLAG_IBSS_RSN;
 	wiphy->interface_modes =
@@ -425,6 +425,8 @@ void mt76_free_device(struct mt76_dev *dev)
 		destroy_workqueue(dev->wq);
 		dev->wq = NULL;
 	}
+	if (mt76_is_mmio(dev))
+		mt76_tx_free(dev);
 	ieee80211_free_hw(dev->hw);
 }
 EXPORT_SYMBOL_GPL(mt76_free_device);

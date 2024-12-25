@@ -16,6 +16,7 @@
 #include <net/mac80211.h>
 #include "util.h"
 
+#define MT_TX_RING_SIZE     256
 #define MT_MCU_RING_SIZE    32
 #define MT_RX_BUF_SIZE      2048
 #define MT_SKB_HEAD_LEN     128
@@ -103,8 +104,6 @@ struct mt76_queue_entry {
 		struct urb *urb;
 	};
 	enum mt76_txq_id qid;
-	u32 dma_addr[2];
-	u16 dma_len[2];
 	bool skip_buf0:1;
 	bool skip_buf1:1;
 	bool schedule:1;
@@ -155,9 +154,7 @@ struct mt76_mcu_ops {
 	int (*mcu_send_msg)(struct mt76_dev *dev, int cmd, const void *data,
 			    int len, bool wait_resp);
 	int (*mcu_skb_send_msg)(struct mt76_dev *dev, struct sk_buff *skb,
-				int cmd, int *seq);
-	int (*mcu_parse_response)(struct mt76_dev *dev, int cmd,
-				  struct sk_buff *skb, int seq);
+				int cmd, bool wait_resp);
 	int (*mcu_wr_rp)(struct mt76_dev *dev, u32 base,
 			 const struct mt76_reg_pair *rp, int len);
 	int (*mcu_rd_rp)(struct mt76_dev *dev, u32 base,
@@ -419,7 +416,6 @@ enum mt76u_out_ep {
 struct mt76_mcu {
 	struct mutex mutex;
 	u32 msg_seq;
-	int timeout;
 
 	struct sk_buff_head res_q;
 	wait_queue_head_t wait;
@@ -435,9 +431,7 @@ struct mt76_usb {
 	u8 *data;
 	u16 data_len;
 
-	struct mt76_worker status_worker;
-	struct mt76_worker rx_worker;
-
+	struct tasklet_struct rx_tasklet;
 	struct work_struct stat_work;
 
 	u8 out_ep[__MT_EP_OUT_MAX];
@@ -613,7 +607,10 @@ enum mt76_phy_type {
 #define mt76_wr_rp(dev, ...)	(dev)->mt76.bus->wr_rp(&((dev)->mt76), __VA_ARGS__)
 #define mt76_rd_rp(dev, ...)	(dev)->mt76.bus->rd_rp(&((dev)->mt76), __VA_ARGS__)
 
+#define mt76_mcu_send_msg(dev, ...)	(dev)->mt76.mcu_ops->mcu_send_msg(&((dev)->mt76), __VA_ARGS__)
 
+#define __mt76_mcu_send_msg(dev, ...)	(dev)->mcu_ops->mcu_send_msg((dev), __VA_ARGS__)
+#define __mt76_mcu_skb_send_msg(dev, ...)	(dev)->mcu_ops->mcu_skb_send_msg((dev), __VA_ARGS__)
 #define mt76_mcu_restart(dev, ...)	(dev)->mt76.mcu_ops->mcu_restart(&((dev)->mt76))
 #define __mt76_mcu_restart(dev, ...)	(dev)->mcu_ops->mcu_restart((dev))
 
@@ -856,6 +853,8 @@ u32 mt76_calc_tx_airtime(struct mt76_dev *dev, struct ieee80211_tx_info *info,
 			 int len);
 
 /* internal */
+void mt76_tx_free(struct mt76_dev *dev);
+struct mt76_txwi_cache *mt76_get_txwi(struct mt76_dev *dev);
 void mt76_put_txwi(struct mt76_dev *dev, struct mt76_txwi_cache *t);
 void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
 		      struct napi_struct *napi);
@@ -898,7 +897,7 @@ mt76u_bulk_msg(struct mt76_dev *dev, void *data, int len, int *actual_len,
 	return usb_bulk_msg(udev, pipe, data, len, actual_len, timeout);
 }
 
-int mt76_skb_adjust_pad(struct sk_buff *skb, int pad);
+int mt76_skb_adjust_pad(struct sk_buff *skb);
 int mt76u_vendor_request(struct mt76_dev *dev, u8 req,
 			 u8 req_type, u16 val, u16 offset,
 			 void *buf, size_t len);
@@ -919,25 +918,6 @@ mt76_mcu_msg_alloc(struct mt76_dev *dev, const void *data,
 void mt76_mcu_rx_event(struct mt76_dev *dev, struct sk_buff *skb);
 struct sk_buff *mt76_mcu_get_response(struct mt76_dev *dev,
 				      unsigned long expires);
-int mt76_mcu_send_and_get_msg(struct mt76_dev *dev, int cmd, const void *data,
-			      int len, bool wait_resp, struct sk_buff **ret);
-int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
-				  int cmd, bool wait_resp, struct sk_buff **ret);
-int mt76_mcu_send_firmware(struct mt76_dev *dev, int cmd, const void *data,
-			   int len);
-static inline int
-mt76_mcu_send_msg(struct mt76_dev *dev, int cmd, const void *data, int len,
-		  bool wait_resp)
-{
-	return mt76_mcu_send_and_get_msg(dev, cmd, data, len, wait_resp, NULL);
-}
-
-static inline int
-mt76_mcu_skb_send_msg(struct mt76_dev *dev, struct sk_buff *skb, int cmd,
-		      bool wait_resp)
-{
-	return mt76_mcu_skb_send_and_get_msg(dev, skb, cmd, wait_resp, NULL);
-}
 
 void mt76_set_irq_mask(struct mt76_dev *dev, u32 addr, u32 clear, u32 set);
 

@@ -612,7 +612,6 @@ static void mt76u_complete_rx(struct urb *urb)
 	case -ECONNRESET:
 	case -ESHUTDOWN:
 	case -ENOENT:
-	case -EPROTO:
 		return;
 	default:
 		dev_err_ratelimited(dev->dev, "rx urb failed: %d\n",
@@ -628,7 +627,7 @@ static void mt76u_complete_rx(struct urb *urb)
 
 	q->head = (q->head + 1) % q->ndesc;
 	q->queued++;
-	mt76_worker_schedule(&dev->usb.rx_worker);
+	tasklet_schedule(&dev->usb.rx_tasklet);
 out:
 	spin_unlock_irqrestore(&q->lock, flags);
 }
@@ -666,17 +665,13 @@ mt76u_process_rx_queue(struct mt76_dev *dev, struct mt76_queue *q)
 		}
 		mt76u_submit_rx_buf(dev, qid, urb);
 	}
-	if (qid == MT_RXQ_MAIN) {
-		local_bh_disable();
+	if (qid == MT_RXQ_MAIN)
 		mt76_rx_poll_complete(dev, MT_RXQ_MAIN, NULL);
-		local_bh_enable();
-	}
 }
 
-static void mt76u_rx_worker(struct mt76_worker *w)
+static void mt76u_rx_tasklet(unsigned long data)
 {
-	struct mt76_usb *usb = container_of(w, struct mt76_usb, rx_worker);
-	struct mt76_dev *dev = container_of(usb, struct mt76_dev, usb);
+	struct mt76_dev *dev = (struct mt76_dev *)data;
 	int i;
 
 	rcu_read_lock();
@@ -742,13 +737,8 @@ mt76u_free_rx_queue(struct mt76_dev *dev, struct mt76_queue *q)
 	struct page *page;
 	int i;
 
-	for (i = 0; i < q->ndesc; i++) {
-		if (!q->entry[i].urb)
-			continue;
-
+	for (i = 0; i < q->ndesc; i++)
 		mt76u_urb_free(q->entry[i].urb);
-		q->entry[i].urb = NULL;
-	}
 
 	if (!q->rx_page.va)
 		return;
@@ -762,8 +752,6 @@ static void mt76u_free_rx(struct mt76_dev *dev)
 {
 	int i;
 
-	mt76_worker_teardown(&dev->usb.rx_worker);
-
 	mt76_for_each_q_rx(dev, i)
 		mt76u_free_rx_queue(dev, &dev->q_rx[i]);
 }
@@ -772,8 +760,6 @@ void mt76u_stop_rx(struct mt76_dev *dev)
 {
 	int i;
 
-	mt76_worker_disable(&dev->usb.rx_worker);
-
 	mt76_for_each_q_rx(dev, i) {
 		struct mt76_queue *q = &dev->q_rx[i];
 		int j;
@@ -781,6 +767,8 @@ void mt76u_stop_rx(struct mt76_dev *dev)
 		for (j = 0; j < q->ndesc; j++)
 			usb_poison_urb(q->entry[j].urb);
 	}
+
+	tasklet_kill(&dev->usb.rx_tasklet);
 }
 EXPORT_SYMBOL_GPL(mt76u_stop_rx);
 
@@ -800,16 +788,13 @@ int mt76u_resume_rx(struct mt76_dev *dev)
 			return err;
 	}
 
-	mt76_worker_enable(&dev->usb.rx_worker);
-
 	return 0;
 }
 EXPORT_SYMBOL_GPL(mt76u_resume_rx);
 
-static void mt76u_status_worker(struct mt76_worker *w)
+static void mt76u_tx_worker(struct mt76_worker *w)
 {
-	struct mt76_usb *usb = container_of(w, struct mt76_usb, status_worker);
-	struct mt76_dev *dev = container_of(usb, struct mt76_dev, usb);
+	struct mt76_dev *dev = container_of(w, struct mt76_dev, tx_worker);
 	struct mt76_queue_entry entry;
 	struct mt76_sw_queue *sq;
 	struct mt76_queue *q;
@@ -821,9 +806,6 @@ static void mt76u_status_worker(struct mt76_worker *w)
 
 		sq = &dev->q_tx[i];
 		q = sq->q;
-
-		if (!q)
-			continue;
 
 		while (q->queued > n_dequeued) {
 			if (!q->entry[q->tail].done)
@@ -856,7 +838,7 @@ static void mt76u_status_worker(struct mt76_worker *w)
 
 		spin_unlock_bh(&q->lock);
 
-		mt76_worker_schedule(&dev->tx_worker);
+		mt76_txq_schedule(dev, i);
 
 		if (dev->drv->tx_status_data &&
 		    !test_and_set_bit(MT76_READING_STATS, &dev->state))
@@ -900,7 +882,7 @@ static void mt76u_complete_tx(struct urb *urb)
 		dev_err(dev->dev, "tx urb failed: %d\n", urb->status);
 	e->done = true;
 
-	mt76_worker_schedule(&dev->usb.status_worker);
+	mt76_worker_schedule(&dev->tx_worker);
 }
 
 static int
@@ -1041,8 +1023,6 @@ static void mt76u_free_tx(struct mt76_dev *dev)
 {
 	int i;
 
-	mt76_worker_teardown(&dev->usb.status_worker);
-
 	for (i = 0; i < IEEE80211_NUM_ACS; i++) {
 		struct mt76_queue *q;
 		int j;
@@ -1051,10 +1031,8 @@ static void mt76u_free_tx(struct mt76_dev *dev)
 		if (!q)
 			continue;
 
-		for (j = 0; j < q->ndesc; j++) {
+		for (j = 0; j < q->ndesc; j++)
 			usb_free_urb(q->entry[j].urb);
-			q->entry[j].urb = NULL;
-		}
 	}
 }
 
@@ -1063,7 +1041,6 @@ void mt76u_stop_tx(struct mt76_dev *dev)
 	int ret;
 
 	mt76_worker_disable(&dev->tx_worker);
-	mt76_worker_disable(&dev->usb.status_worker);
 
 	ret = wait_event_timeout(dev->tx_wait, !mt76_has_tx_pending(dev),
 				 HZ / 5);
@@ -1108,7 +1085,6 @@ void mt76u_stop_tx(struct mt76_dev *dev)
 	clear_bit(MT76_READING_STATS, &dev->state);
 
 	mt76_worker_enable(&dev->tx_worker);
-	mt76_worker_enable(&dev->usb.status_worker);
 
 	mt76_tx_status_check(dev, NULL, true);
 }
@@ -1144,7 +1120,6 @@ static const struct mt76_queue_ops usb_queue_ops = {
 int mt76u_init(struct mt76_dev *dev,
 	       struct usb_interface *intf, bool ext)
 {
-	struct sched_param sparam = {.sched_priority = 1};
 	static struct mt76_bus_ops mt76u_ops = {
 		.read_copy = mt76u_read_copy_ext,
 		.wr_rp = mt76u_wr_rp,
@@ -1153,13 +1128,15 @@ int mt76u_init(struct mt76_dev *dev,
 	};
 	struct usb_device *udev = interface_to_usbdev(intf);
 	struct mt76_usb *usb = &dev->usb;
-	int err;
+	int err = -ENOMEM;
 
 	mt76u_ops.rr = ext ? mt76u_rr_ext : mt76u_rr;
 	mt76u_ops.wr = ext ? mt76u_wr_ext : mt76u_wr;
 	mt76u_ops.rmw = ext ? mt76u_rmw_ext : mt76u_rmw;
 	mt76u_ops.write_copy = ext ? mt76u_copy_ext : mt76u_copy;
 
+	dev->tx_worker.fn = mt76u_tx_worker;
+	tasklet_init(&usb->rx_tasklet, mt76u_rx_tasklet, (unsigned long)dev);
 	INIT_WORK(&usb->stat_work, mt76u_tx_status_data);
 
 	usb->data_len = usb_maxpacket(udev, usb_sndctrlpipe(udev, 0), 1);
@@ -1168,7 +1145,7 @@ int mt76u_init(struct mt76_dev *dev,
 
 	usb->data = devm_kmalloc(dev->dev, usb->data_len, GFP_KERNEL);
 	if (!usb->data)
-		return -ENOMEM;
+		goto error;
 
 	mutex_init(&usb->usb_ctrl_mtx);
 	dev->bus = &mt76u_ops;
@@ -1180,22 +1157,14 @@ int mt76u_init(struct mt76_dev *dev,
 
 	err = mt76u_set_endpoints(intf, usb);
 	if (err < 0)
-		return err;
-
-	err = mt76_worker_setup(dev->hw, &usb->rx_worker, mt76u_rx_worker,
-				"usb-rx");
-	if (err)
-		return err;
-	
-	err = mt76_worker_setup(dev->hw, &usb->status_worker,
-				mt76u_status_worker, "usb-status");
-	if (err)
-		return err;
-
-	sched_setscheduler(usb->rx_worker.task, SCHED_FIFO, &sparam);
-	sched_setscheduler(usb->status_worker.task, SCHED_FIFO, &sparam);
+		goto error;
 
 	return 0;
+
+error:
+	destroy_workqueue(dev->wq);
+
+	return err;
 }
 EXPORT_SYMBOL_GPL(mt76u_init);
 

@@ -5,6 +5,75 @@
 
 #include "mt76.h"
 
+static struct mt76_txwi_cache *
+mt76_alloc_txwi(struct mt76_dev *dev)
+{
+	struct mt76_txwi_cache *t;
+	dma_addr_t addr;
+	u8 *txwi;
+	int size;
+
+	size = L1_CACHE_ALIGN(dev->drv->txwi_size + sizeof(*t));
+	txwi = devm_kzalloc(dev->dev, size, GFP_ATOMIC);
+	if (!txwi)
+		return NULL;
+
+	addr = dma_map_single(dev->dev, txwi, dev->drv->txwi_size,
+			      DMA_TO_DEVICE);
+	t = (struct mt76_txwi_cache *)(txwi + dev->drv->txwi_size);
+	t->dma_addr = addr;
+
+	return t;
+}
+
+static struct mt76_txwi_cache *
+__mt76_get_txwi(struct mt76_dev *dev)
+{
+	struct mt76_txwi_cache *t = NULL;
+
+	spin_lock_bh(&dev->lock);
+	if (!list_empty(&dev->txwi_cache)) {
+		t = list_first_entry(&dev->txwi_cache, struct mt76_txwi_cache,
+				     list);
+		list_del(&t->list);
+	}
+	spin_unlock_bh(&dev->lock);
+
+	return t;
+}
+
+struct mt76_txwi_cache *
+mt76_get_txwi(struct mt76_dev *dev)
+{
+	struct mt76_txwi_cache *t = __mt76_get_txwi(dev);
+
+	if (t)
+		return t;
+
+	return mt76_alloc_txwi(dev);
+}
+
+void
+mt76_put_txwi(struct mt76_dev *dev, struct mt76_txwi_cache *t)
+{
+	if (!t)
+		return;
+
+	spin_lock_bh(&dev->lock);
+	list_add(&t->list, &dev->txwi_cache);
+	spin_unlock_bh(&dev->lock);
+}
+EXPORT_SYMBOL_GPL(mt76_put_txwi);
+
+void mt76_tx_free(struct mt76_dev *dev)
+{
+	struct mt76_txwi_cache *t;
+
+	while ((t = __mt76_get_txwi(dev)) != NULL)
+		dma_unmap_single(dev->dev, t->dma_addr, dev->drv->txwi_size,
+				 DMA_TO_DEVICE);
+}
+
 static int
 mt76_txq_get_qid(struct ieee80211_txq *txq)
 {
@@ -399,6 +468,7 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 	struct mt76_wcid *wcid;
 	int ret = 0;
 
+	spin_lock_bh(&hwq->lock);
 	while (1) {
 		if (sq->swq_queued >= 4)
 			break;
@@ -418,8 +488,6 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 		if (wcid && test_bit(MT_WCID_FLAG_PS, &wcid->flags))
 			continue;
 
-		spin_lock_bh(&hwq->lock);	
-
 		if (mtxq->send_bar && mtxq->aggr) {
 			struct ieee80211_txq *txq = mtxq_to_txq(mtxq);
 			struct ieee80211_sta *sta = txq->sta;
@@ -433,12 +501,11 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 			spin_lock_bh(&hwq->lock);
 		}
 
-		spin_unlock_bh(&hwq->lock);
-
 		ret += mt76_txq_send_burst(dev, sq, mtxq);
 		ieee80211_return_txq(dev->hw, txq,
 				     !skb_queue_empty(&mtxq->retry_q));
 	}
+	spin_unlock_bh(&hwq->lock);
 
 	return ret;
 }
@@ -557,9 +624,13 @@ u8 mt76_ac_to_hwq(u8 ac)
 }
 EXPORT_SYMBOL_GPL(mt76_ac_to_hwq);
 
-int mt76_skb_adjust_pad(struct sk_buff *skb, int pad)
+int mt76_skb_adjust_pad(struct sk_buff *skb)
 {
 	struct sk_buff *iter, *last = skb;
+	u32 pad;
+
+	/* Add zero pad of 4 - 7 bytes */
+	pad = round_up(skb->len, 4) + 4 - skb->len;
 
 	/* First packet of a A-MSDU burst keeps track of the whole burst
 	 * length, need to update length of it and the last packet.

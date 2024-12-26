@@ -1630,7 +1630,7 @@ mt7603_edcca_check(struct mt7603_dev *dev)
 	if (rssi0 > 128)
 		rssi0 -= 256;
 
-	if (dev->mphy.antenna_mask & BIT(1)) {
+	if (dev->mt76.antenna_mask & BIT(1)) {
 		rssi1 = FIELD_GET(MT_AGC_41_RSSI_1, val);
 		if (rssi1 > 128)
 			rssi1 -= 256;

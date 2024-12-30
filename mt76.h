@@ -1081,6 +1081,7 @@ s8 mt76_get_rate_power_limits(struct mt76_dev *dev,
 
 void mt76_wcid_init(struct mt76_wcid *wcid);
 void mt76_wcid_cleanup(struct mt76_dev *dev, struct mt76_wcid *wcid);
+void mt76_wcid_add_poll(struct mt76_dev *dev, struct mt76_wcid *wcid);
 
 /**
  * ieee80211_is_bufferable_mmpdu - check if frame is bufferable MMPDU

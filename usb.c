@@ -952,7 +952,6 @@ mt76u_tx_queue_skb(struct mt76_dev *dev, enum mt76_txq_id qid,
 
 	q->head = (q->head + 1) % q->ndesc;
 	q->entry[idx].skb = tx_info.skb;
-	q->entry[idx].wcid = 0xffff;
 	q->queued++;
 
 	return idx;

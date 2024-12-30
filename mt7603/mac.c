@@ -555,7 +555,7 @@ mt7603_mac_fill_rx(struct mt7603_dev *dev, struct sk_buff *skb)
 			case MT_CIPHER_CCMP_256:
 				insert_ccmp_hdr =
 					FIELD_GET(MT_RXD2_NORMAL_FRAG, rxd2);
-				fallthrough;
+				/* fall through */
 			case MT_CIPHER_TKIP:
 			case MT_CIPHER_TKIP_NO_MIC:
 			case MT_CIPHER_GCMP:

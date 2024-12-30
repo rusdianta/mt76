@@ -944,5 +944,6 @@ void mt76_set_irq_mask(struct mt76_dev *dev, u32 addr, u32 clear, u32 set);
 
 void mt76_wcid_init(struct mt76_wcid *wcid);
 void mt76_wcid_cleanup(struct mt76_dev *dev, struct mt76_wcid *wcid);
+void mt76_wcid_add_poll(struct mt76_dev *dev, struct mt76_wcid *wcid);
 
 #endif

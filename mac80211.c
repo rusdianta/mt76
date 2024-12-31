@@ -99,6 +99,11 @@ struct ieee80211_rate mt76_rates[] = {
 };
 EXPORT_SYMBOL_GPL(mt76_rates);
 
+static inline u64 ktime_get_boottime_ns_dev(void)
+{
+	return ktime_to_ns(ktime_get_boottime());
+}
+
 static int mt76_led_init(struct mt76_dev *dev)
 {
 	struct device_node *np = dev->dev->of_node;
@@ -639,7 +644,7 @@ static struct ieee80211_sta *mt76_rx_convert(struct sk_buff *skb)
 
 	if (ieee80211_is_beacon(hdr->frame_control) ||
 	    ieee80211_is_probe_resp(hdr->frame_control))
-		status->boottime_ns = ktime_get_boottime_ns();
+		status->boottime_ns = ktime_get_boottime_ns_dev();
 
 	BUILD_BUG_ON(sizeof(mstat) > sizeof(skb->cb));
 	BUILD_BUG_ON(sizeof(status->chain_signal) !=

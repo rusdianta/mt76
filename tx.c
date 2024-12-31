@@ -75,6 +75,7 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
 	/* Tx status can be unreliable. if it fails, mark the frame as ACKed */
 	if (flags & MT_TX_CB_TXS_FAILED) {
 		ieee80211_tx_info_clear_status(info);
+		info->status.rates[0].count = 0;
 		info->status.rates[0].idx = -1;
 		info->flags |= IEEE80211_TX_STAT_ACK;
 	}
@@ -121,6 +122,7 @@ mt76_tx_status_skb_add(struct mt76_dev *dev, struct mt76_wcid *wcid,
 
 	cb->wcid = wcid->idx;
 	cb->pktid = pid;
+	cb->jiffies = jiffies;
 
 	if (list_empty(&wcid->list))
 		list_add_tail(&wcid->list, &dev->wcid_list);
@@ -153,8 +155,8 @@ mt76_tx_status_skb_get(struct mt76_dev *dev, struct mt76_wcid *wcid, int pktid,
 			if (!(cb->flags & MT_TX_CB_DMA_DONE))
 				continue;
 
-			if (!time_is_after_jiffies(cb->jiffies +
-						   MT_TX_STATUS_SKB_TIMEOUT))
+			if (pktid >= 0 && !time_after(jiffies, cb->jiffies +
+					      MT_TX_STATUS_SKB_TIMEOUT))
 				continue;
 		}
 
@@ -181,8 +183,11 @@ mt76_tx_status_check(struct mt76_dev *dev, bool flush)
 	struct sk_buff_head list;
 
 	mt76_tx_status_lock(dev, &list);
-	list_for_each_entry_safe(wcid, tmp, &dev->wcid_list, list)
+	while (!list_empty(&dev->wcid_list)) {
+		wcid = list_first_entry(&dev->wcid_list, struct mt76_wcid,
+					list);
 		mt76_tx_status_skb_get(dev, wcid, flush ? -1 : 0, &list);
+	}
 	mt76_tx_status_unlock(dev, &list);
 }
 EXPORT_SYMBOL_GPL(mt76_tx_status_check);
@@ -198,7 +203,6 @@ void mt76_tx_complete_skb(struct mt76_dev *dev, struct sk_buff *skb)
 	}
 
 	mt76_tx_status_lock(dev, &list);
-	cb->jiffies = jiffies;
 	__mt76_tx_status_skb_done(dev, skb, MT_TX_CB_DMA_DONE, &list);
 	mt76_tx_status_unlock(dev, &list);
 }

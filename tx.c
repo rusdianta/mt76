@@ -194,7 +194,6 @@ EXPORT_SYMBOL_GPL(mt76_tx_status_check);
 
 void mt76_tx_complete_skb(struct mt76_dev *dev, struct sk_buff *skb)
 {
-	struct mt76_tx_cb *cb = mt76_tx_skb_cb(skb);
 	struct sk_buff_head list;
 
 	if (!skb->prev) {

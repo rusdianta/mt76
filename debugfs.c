@@ -30,30 +30,33 @@ int mt76_queues_read(struct seq_file *s, void *data)
 	struct mt76_dev *dev = dev_get_drvdata(s->private);
 	int i;
 
-	seq_puts(s, "     queue | hw-queued |      head |      tail |\n");
 	for (i = 0; i < ARRAY_SIZE(dev->q_tx); i++) {
 		struct mt76_sw_queue *q = &dev->q_tx[i];
 
 		if (!q->q)
 			continue;
 
-		seq_printf(s, " %9d | %9d | %9d | %9d |\n",
+		seq_printf(s,
+			   "%d:	queued=%d head=%d tail=%d swq_queued=%d\n",
 			   i, q->q->queued, q->q->head, q->q->tail,
 			   q->swq_queued);
 	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(mt76_queues_read);
 
 static int mt76_rx_queues_read(struct seq_file *s, void *data)
 {
 	struct mt76_dev *dev = dev_get_drvdata(s->private);
 	int i, queued;
 
-	seq_puts(s, "     queue | hw-queued |      head |      tail |\n");
 	mt76_for_each_q_rx(dev, i) {
 		struct mt76_queue *q = &dev->q_rx[i];
 
 		queued = mt76_is_usb(dev) ? q->ndesc - q->queued : q->queued;
-		seq_printf(s, " %9d | %9d | %9d | %9d |\n",
-			   i, q->queued, q->head, q->tail);
+		seq_printf(s, "%d:	queued=%d head=%d tail=%d\n",
+			   i, queued, q->head, q->tail);
 	}
 
 	return 0;

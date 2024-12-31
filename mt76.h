@@ -245,14 +245,13 @@ struct mt76_wcid {
 	u8 amsdu:1;
 
 	u8 rx_check_pn;
-	u8 rx_key_pn[IEEE80211_NUM_TIDS + 1][6];
+	u8 rx_key_pn[IEEE80211_NUM_TIDS][6];
 	u16 cipher;
 
 	u32 tx_info;
 	bool sw_iv;
 
-	struct list_head list;
-	struct idr pktid;
+	u8 packet_id;
 };
 
 struct mt76_txq {
@@ -301,13 +300,8 @@ struct mt76_rx_tid {
 #define MT_PACKET_ID_NO_SKB		1
 #define MT_PACKET_ID_FIRST		2
 #define MT_PACKET_ID_HAS_RATE		BIT(7)
-/* This is timer for when to give up when waiting for TXS callback,
- * with starting time being the time at which the DMA_DONE callback
- * was seen (so, we know packet was processed then, it should not take
- * long after that for firmware to send the TXS callback if it is going
- * to do so.)
- */
-#define MT_TX_STATUS_SKB_TIMEOUT	(HZ / 4)
+
+#define MT_TX_STATUS_SKB_TIMEOUT	HZ
 
 struct mt76_tx_cb {
 	unsigned long jiffies;
@@ -560,14 +554,12 @@ struct mt76_dev {
 	struct delayed_work mac_work;
 
 	wait_queue_head_t tx_wait;
-	/* spinclock used to protect wcid pktid linked list */
-	spinlock_t status_lock;
+	struct sk_buff_head status_list;
 
 	unsigned long wcid_mask[MT76_N_WCIDS / BITS_PER_LONG];
 
 	struct mt76_wcid global_wcid;
 	struct mt76_wcid __rcu *wcid[MT76_N_WCIDS];
-	struct list_head wcid_list;
 
 	u8 macaddr[ETH_ALEN];
 	u32 rev;
@@ -862,9 +854,9 @@ void mt76_wcid_key_setup(struct mt76_dev *dev, struct mt76_wcid *wcid,
 			 struct ieee80211_key_conf *key);
 
 void mt76_tx_status_lock(struct mt76_dev *dev, struct sk_buff_head *list)
-			 __acquires(&dev->status_lock);
+			 __acquires(&dev->status_list.lock);
 void mt76_tx_status_unlock(struct mt76_dev *dev, struct sk_buff_head *list)
-			   __releases(&dev->status_lock);
+			   __releases(&dev->status_list.lock);
 
 int mt76_tx_status_skb_add(struct mt76_dev *dev, struct mt76_wcid *wcid,
 			   struct sk_buff *skb);
@@ -874,7 +866,8 @@ struct sk_buff *mt76_tx_status_skb_get(struct mt76_dev *dev,
 void mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb,
 			     struct sk_buff_head *list);
 void mt76_tx_complete_skb(struct mt76_dev *dev, struct sk_buff *skb);
-void mt76_tx_status_check(struct mt76_dev *dev, bool flush);
+void mt76_tx_status_check(struct mt76_dev *dev, struct mt76_wcid *wcid,
+			  bool flush);
 int mt76_sta_state(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		   struct ieee80211_sta *sta,
 		   enum ieee80211_sta_state old_state,
@@ -973,17 +966,8 @@ int mt76_mcu_send_and_get_msg(struct mt76_dev *dev, int cmd, const void *data,
 			      int len, bool wait_resp, struct sk_buff **ret);
 int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
 				  int cmd, bool wait_resp, struct sk_buff **ret);
-int __mt76_mcu_send_firmware(struct mt76_dev *dev, int cmd, const void *data,
-			     int len, int max_len);
-static inline int
-mt76_mcu_send_firmware(struct mt76_dev *dev, int cmd, const void *data,
-		       int len)
-{
-	int max_len = 4096 - dev->mcu_ops->headroom;
-
-	return __mt76_mcu_send_firmware(dev, cmd, data, len, max_len);
-}
-
+int mt76_mcu_send_firmware(struct mt76_dev *dev, int cmd, const void *data,
+			   int len);
 static inline int
 mt76_mcu_send_msg(struct mt76_dev *dev, int cmd, const void *data, int len,
 		  bool wait_resp)
@@ -1005,22 +989,14 @@ s8 mt76_get_rate_power_limits(struct mt76_dev *dev,
 			      struct mt76_power_limits *dest,
 			      s8 target_power);
 
-static inline void mt76_packet_id_init(struct mt76_wcid *wcid)
+static inline int
+mt76_get_next_pkt_id(struct mt76_wcid *wcid)
 {
-	INIT_LIST_HEAD(&wcid->list);
-	idr_init(&wcid->pktid);
-}
-
-static inline void
-mt76_packet_id_flush(struct mt76_dev *dev, struct mt76_wcid *wcid)
-{
-	struct sk_buff_head list;
-
-	mt76_tx_status_lock(dev, &list);
-	mt76_tx_status_skb_get(dev, wcid, -1, &list);
-	mt76_tx_status_unlock(dev, &list);
-
-	idr_destroy(&wcid->pktid);
+	wcid->packet_id = (wcid->packet_id + 1) & MT_PACKET_ID_MASK;
+	if (wcid->packet_id == MT_PACKET_ID_NO_ACK ||
+	    wcid->packet_id == MT_PACKET_ID_NO_SKB)
+		wcid->packet_id = MT_PACKET_ID_FIRST;
+	return wcid->packet_id;
 }
 
 #endif

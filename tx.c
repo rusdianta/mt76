@@ -38,20 +38,20 @@ EXPORT_SYMBOL_GPL(mt76_tx_check_agg_ssn);
 
 void
 mt76_tx_status_lock(struct mt76_dev *dev, struct sk_buff_head *list)
-		   __acquires(&dev->status_lock)
+		   __acquires(&dev->status_list.lock)
 {
 	__skb_queue_head_init(list);
-	spin_lock_bh(&dev->status_lock);
+	spin_lock_bh(&dev->status_list.lock);
 }
 EXPORT_SYMBOL_GPL(mt76_tx_status_lock);
 
 void
 mt76_tx_status_unlock(struct mt76_dev *dev, struct sk_buff_head *list)
-		      __releases(&dev->status_lock)
+		      __releases(&dev->status_list.lock)
 {
 	struct sk_buff *skb;
 
-	spin_unlock_bh(&dev->status_lock);
+	spin_unlock_bh(&dev->status_list.lock);
 
 	while ((skb = __skb_dequeue(list)) != NULL)
 		ieee80211_tx_status(dev->hw, skb);
@@ -72,10 +72,11 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
 	if ((flags & done) != done)
 		return;
 
+	__skb_unlink(skb, &dev->status_list);
+
 	/* Tx status can be unreliable. if it fails, mark the frame as ACKed */
 	if (flags & MT_TX_CB_TXS_FAILED) {
 		ieee80211_tx_info_clear_status(info);
-		info->status.rates[0].count = 0;
 		info->status.rates[0].idx = -1;
 		info->flags |= IEEE80211_TX_STAT_ACK;
 	}
@@ -99,8 +100,6 @@ mt76_tx_status_skb_add(struct mt76_dev *dev, struct mt76_wcid *wcid,
 	struct mt76_tx_cb *cb = mt76_tx_skb_cb(skb);
 	int pid;
 
-	memset(cb, 0, sizeof(*cb));
-
 	if (!wcid)
 		return MT_PACKET_ID_NO_ACK;
 
@@ -111,24 +110,16 @@ mt76_tx_status_skb_add(struct mt76_dev *dev, struct mt76_wcid *wcid,
 			     IEEE80211_TX_CTL_RATE_CTRL_PROBE)))
 		return MT_PACKET_ID_NO_SKB;
 
-	spin_lock_bh(&dev->status_lock);
+	spin_lock_bh(&dev->status_list.lock);
 
-	pid = idr_alloc(&wcid->pktid, skb, MT_PACKET_ID_FIRST,
-			MT_PACKET_ID_MASK, GFP_ATOMIC);
-	if (pid < 0) {
-		pid = MT_PACKET_ID_NO_SKB;
-		goto out;
-	}
-
+	memset(cb, 0, sizeof(*cb));
+	pid = mt76_get_next_pkt_id(wcid);
 	cb->wcid = wcid->idx;
 	cb->pktid = pid;
 	cb->jiffies = jiffies;
 
-	if (list_empty(&wcid->list))
-		list_add_tail(&wcid->list, &dev->wcid_list);
-
-out:
-	spin_unlock_bh(&dev->status_lock);
+	__skb_queue_tail(&dev->status_list, skb);
+	spin_unlock_bh(&dev->status_list.lock);
 
 	return pid;
 }
@@ -138,56 +129,36 @@ struct sk_buff *
 mt76_tx_status_skb_get(struct mt76_dev *dev, struct mt76_wcid *wcid, int pktid,
 		       struct sk_buff_head *list)
 {
-	struct sk_buff *skb;
-	int id;
+	struct sk_buff *skb, *tmp;
 
-	lockdep_assert_held(&dev->status_lock);
-
-	skb = idr_remove(&wcid->pktid, pktid);
-	if (skb)
-		goto out;
-
-	/* look for stale entries in the wcid idr queue */
-	idr_for_each_entry(&wcid->pktid, skb, id) {
+	skb_queue_walk_safe(&dev->status_list, skb, tmp) {
 		struct mt76_tx_cb *cb = mt76_tx_skb_cb(skb);
 
-		if (pktid >= 0) {
-			if (!(cb->flags & MT_TX_CB_DMA_DONE))
-				continue;
+		if (wcid && cb->wcid != wcid->idx)
+			continue;
 
-			if (pktid >= 0 && !time_after(jiffies, cb->jiffies +
+		if (cb->pktid == pktid)
+			return skb;
+
+		if (pktid >= 0 && !time_after(jiffies, cb->jiffies +
 					      MT_TX_STATUS_SKB_TIMEOUT))
-				continue;
-		}
+			continue;
 
-		/* It has been too long since DMA_DONE, time out this packet
-		 * and stop waiting for TXS callback.
-		 */
-		idr_remove(&wcid->pktid, cb->pktid);
 		__mt76_tx_status_skb_done(dev, skb, MT_TX_CB_TXS_FAILED |
 						    MT_TX_CB_TXS_DONE, list);
 	}
 
-out:
-	if (idr_is_empty(&wcid->pktid))
-		list_del_init(&wcid->list);
-
-	return skb;
+	return NULL;
 }
 EXPORT_SYMBOL_GPL(mt76_tx_status_skb_get);
 
 void
-mt76_tx_status_check(struct mt76_dev *dev, bool flush)
+mt76_tx_status_check(struct mt76_dev *dev, struct mt76_wcid *wcid, bool flush)
 {
-	struct mt76_wcid *wcid;
 	struct sk_buff_head list;
 
 	mt76_tx_status_lock(dev, &list);
-	while (!list_empty(&dev->wcid_list)) {
-		wcid = list_first_entry(&dev->wcid_list, struct mt76_wcid,
-					list);
-		mt76_tx_status_skb_get(dev, wcid, flush ? -1 : 0, &list);
-	}
+	mt76_tx_status_skb_get(dev, wcid, flush ? -1 : 0, &list);
 	mt76_tx_status_unlock(dev, &list);
 }
 EXPORT_SYMBOL_GPL(mt76_tx_status_check);

@@ -405,8 +405,7 @@ mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_sw_queue *sq,
 		sq->swq_queued++;
 	}
 
-	if (n_frames)
-		dev->queue_ops->kick(dev, hwq);
+	dev->queue_ops->kick(dev, hwq);
 
 	return n_frames;
 }

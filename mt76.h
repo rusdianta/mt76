@@ -21,6 +21,8 @@
 #define MT_SKB_HEAD_LEN		256
 
 #define IEEE80211_AMPDU_TX_START_IMMEDIATE 1
+/* for tx_highest */
+#define IEEE80211_VHT_EXT_NSS_BW_CAPABLE	(1 << 13)
 
 struct mt76_dev;
 struct mt76_wcid;

@@ -94,17 +94,17 @@ enum ieee80211_hw_flags_dev {
 	IEEE80211_HW_SUPPORTS_VHT_EXT_NSS_BW = 42,
 };
 
-/* Action category code */
-enum ieee80211_category_dev {	
-	WLAN_CATEGORY_PUBLIC = 4,
-	WLAN_CATEGORY_PROTECTED_DUAL_OF_ACTION = 9,
-};
+// /* Action category code */
+// enum ieee80211_category_dev {	
+// 	WLAN_CATEGORY_PUBLIC = 4,
+// 	WLAN_CATEGORY_PROTECTED_DUAL_OF_ACTION = 9,
+// };
 
-/* Public action codes (IEEE Std 802.11-2016, 9.6.8.1, Table 9-307) */
-enum ieee80211_pub_actioncode_dev {	
-	WLAN_PUB_ACTION_FTM_REQUEST = 32,
-	WLAN_PUB_ACTION_FTM_RESPONSE = 33,
-};
+// /* Public action codes (IEEE Std 802.11-2016, 9.6.8.1, Table 9-307) */
+// enum ieee80211_pub_actioncode_dev {	
+// 	WLAN_PUB_ACTION_FTM_REQUEST = 32,
+// 	WLAN_PUB_ACTION_FTM_RESPONSE = 33,
+// };
 
 enum mt76_cipher_type {
 	MT_CIPHER_NONE,

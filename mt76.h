@@ -90,6 +90,10 @@ enum mac80211_tx_info_flags_dev {
 	IEEE80211_TX_CTL_HW_80211_ENCAP		= BIT(14),
 };
 
+enum ieee80211_hw_flags_dev {	
+	IEEE80211_HW_SUPPORTS_VHT_EXT_NSS_BW = 42,
+};
+
 enum mt76_cipher_type {
 	MT_CIPHER_NONE,
 	MT_CIPHER_WEP40,
@@ -715,6 +719,13 @@ static inline u16 mt76_rev(struct mt76_dev *dev)
 #define mt76_for_each_q_rx(dev, i)	\
 	for (i = 0; i < ARRAY_SIZE((dev)->q_rx); i++)	\
 		if ((dev)->q_rx[i].ndesc)
+
+static inline bool _ieee80211_hw_check_dev(struct ieee80211_hw *hw,
+				       enum ieee80211_hw_flags_dev flg)
+{
+	return test_bit(flg, hw->flags);
+}
+#define ieee80211_hw_check_dev(hw, flg)	_ieee80211_hw_check_dev(hw, flg)
 
 struct mt76_dev *mt76_alloc_device(struct device *pdev, unsigned int size,
 				   const struct ieee80211_ops *ops,

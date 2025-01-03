@@ -141,6 +141,35 @@ mt76_dma_alloc_queue(struct mt76_dev *dev, struct mt76_queue *q,
 }
 
 static int
+mt76_dma_add_rx_buf(struct mt76_dev *dev, struct mt76_queue *q,
+		    struct mt76_queue_buf *buf, void *data)
+{
+	struct mt76_desc *desc = &q->desc[q->head];
+	struct mt76_queue_entry *entry = &q->entry[q->head];
+	struct mt76_txwi_cache *txwi = NULL;
+	u32 buf1 = 0, ctrl;
+	int idx = q->head;
+
+	ctrl = FIELD_PREP(MT_DMA_CTL_SD_LEN0, buf[0].len);
+	
+	WRITE_ONCE(desc->buf0, cpu_to_le32(buf->addr));
+	WRITE_ONCE(desc->buf1, cpu_to_le32(buf1));
+	WRITE_ONCE(desc->ctrl, cpu_to_le32(ctrl));
+	WRITE_ONCE(desc->info, 0);
+
+	entry->dma_addr[0] = buf->addr;
+	entry->dma_len[0] = buf->len;
+	entry->txwi = txwi;
+	entry->buf = data;
+	entry->wcid = 0xffff;
+	entry->skip_buf1 = true;
+	q->head = (q->head + 1) % q->ndesc;
+	q->queued++;
+
+	return idx;
+}
+
+static int
 mt76_dma_add_buf(struct mt76_dev *dev, struct mt76_queue *q,
 		 struct mt76_queue_buf *buf, int nbufs, u32 info,
 		 struct sk_buff *skb, void *txwi)
@@ -150,6 +179,11 @@ mt76_dma_add_buf(struct mt76_dev *dev, struct mt76_queue *q,
 	int i, idx = -1;
 	u32 ctrl, next;	
 
+	if (txwi) {
+		q->entry[q->head].txwi = DMA_DUMMY_DATA;
+		q->entry[q->head].skip_buf0 = true;
+	}
+
 	for (i = 0; i < nbufs; i += 2, buf += 2) {
 		u32 buf0 = buf[0].addr, buf1 = 0;
 
@@ -157,12 +191,7 @@ mt76_dma_add_buf(struct mt76_dev *dev, struct mt76_queue *q,
 		next = (q->head + 1) % q->ndesc;
 
 		desc = &q->desc[idx];
-		entry = &q->entry[idx];
-
-		if (txwi) {
-			q->entry[q->head].txwi = DMA_DUMMY_DATA;
-			q->entry[q->head].skip_buf0 = true;
-		}
+		entry = &q->entry[idx];		
 
 		if (buf[0].skip_unmap)
 			entry->skip_buf0 = true;
@@ -459,11 +488,10 @@ free:
 static int
 mt76_dma_rx_fill(struct mt76_dev *dev, struct mt76_queue *q)
 {
-	dma_addr_t addr;
-	void *buf;
-	int frames = 0;
+	
 	int len = SKB_WITH_OVERHEAD(q->buf_size);
-	int offset = q->buf_offset;
+	int frames = 0, offset = q->buf_offset;
+	dma_addr_t addr;
 
 	if (!q->ndesc)
 		return 0;
@@ -472,6 +500,7 @@ mt76_dma_rx_fill(struct mt76_dev *dev, struct mt76_queue *q)
 
 	while (q->queued < q->ndesc - 1) {
 		struct mt76_queue_buf qbuf;
+		void *buf = NULL;
 
 		buf = page_frag_alloc(&q->rx_page, q->buf_size, GFP_ATOMIC);
 		if (!buf)
@@ -486,7 +515,7 @@ mt76_dma_rx_fill(struct mt76_dev *dev, struct mt76_queue *q)
 		qbuf.addr = addr + offset;
 		qbuf.len = len - offset;
 		qbuf.skip_unmap = false;
-		if (mt76_dma_add_buf(dev, q, &qbuf, 1, 0, buf, t) < 0) {
+		if (mt76_dma_add_rx_buf(dev, q, &qbuf, buf) < 0) {
 			dma_unmap_single(dev->dma_dev, addr, len,
 					 DMA_FROM_DEVICE);
 			skb_free_frag(buf);

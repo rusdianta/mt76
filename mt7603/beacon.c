@@ -130,8 +130,8 @@ void mt7603_pre_tbtt_tasklet(unsigned long arg)
 	mt76_queue_kick(dev, q);
 	spin_unlock(&q->lock);
 
-	mt76_csa_check(mdev);
-	if (mdev->csa_complete)
+	mt76_csa_check(&dev->mt76);
+	if (dev->mt76.csa_complete)
 		return;
 
 	q = dev->mt76.q_tx[MT_TXQ_CAB].q;

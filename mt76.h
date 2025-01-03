@@ -94,6 +94,18 @@ enum ieee80211_hw_flags_dev {
 	IEEE80211_HW_SUPPORTS_VHT_EXT_NSS_BW = 42,
 };
 
+/* Action category code */
+enum ieee80211_category_dev {	
+	WLAN_CATEGORY_PUBLIC = 4,
+	WLAN_CATEGORY_PROTECTED_DUAL_OF_ACTION = 9,
+};
+
+/* Public action codes (IEEE Std 802.11-2016, 9.6.8.1, Table 9-307) */
+enum ieee80211_pub_actioncode_dev {	
+	WLAN_PUB_ACTION_FTM_REQUEST = 32,
+	WLAN_PUB_ACTION_FTM_RESPONSE = 33,
+};
+
 enum mt76_cipher_type {
 	MT_CIPHER_NONE,
 	MT_CIPHER_WEP40,
@@ -1046,6 +1058,45 @@ mt76_packet_id_flush(struct mt76_dev *dev, struct mt76_wcid *wcid)
 	mt76_tx_status_skb_get(dev, wcid, -1, &list);
 	mt76_tx_status_unlock(dev, &list);
 	idr_destroy(&wcid->pktid);
+}
+
+/**
+ * ieee80211_is_bufferable_mmpdu - check if frame is bufferable MMPDU
+ * @skb: the skb to check, starting with the 802.11 header
+ * Return: whether or not the MMPDU is bufferable
+ */
+static inline bool ieee80211_is_bufferable_mmpdu_dev(struct sk_buff *skb)
+{
+	struct ieee80211_mgmt *mgmt = (void *)skb->data;
+	__le16 fc = mgmt->frame_control;
+
+	/*
+	 * IEEE 802.11 REVme D2.0 definition of bufferable MMPDU;
+	 * note that this ignores the IBSS special case.
+	 */
+	if (!ieee80211_is_mgmt(fc))
+		return false;
+
+	if (ieee80211_is_disassoc(fc) || ieee80211_is_deauth(fc))
+		return true;
+
+	if (!ieee80211_is_action(fc))
+		return false;
+
+	if (skb->len < offsetofend(typeof(*mgmt), u.action.u.ftm.action_code))
+		return true;
+
+	/* action frame - additionally check for non-bufferable FTM */
+
+	if (mgmt->u.action.category != WLAN_CATEGORY_PUBLIC &&
+	    mgmt->u.action.category != WLAN_CATEGORY_PROTECTED_DUAL_OF_ACTION)
+		return true;
+
+	if (mgmt->u.action.u.ftm.action_code == WLAN_PUB_ACTION_FTM_REQUEST ||
+	    mgmt->u.action.u.ftm.action_code == WLAN_PUB_ACTION_FTM_RESPONSE)
+		return false;
+
+	return true;
 }
 
 #endif

@@ -161,7 +161,6 @@ mt76_dma_add_rx_buf(struct mt76_dev *dev, struct mt76_queue *q,
 	entry->dma_len[0] = buf->len;
 	entry->txwi = txwi;
 	entry->buf = data;
-	entry->wcid = 0xffff;
 	entry->skip_buf1 = true;
 	q->head = (q->head + 1) % q->ndesc;
 	q->queued++;

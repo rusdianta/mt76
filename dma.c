@@ -426,7 +426,7 @@ mt76_dma_tx_queue_skb(struct mt76_dev *dev, enum mt76_txq_id qid,
 	u8 *txwi;
 
 	if (test_bit(MT76_RESET, &dev->state))
-		goto free_skb;
+		goto free;
 
 	t = mt76_get_txwi(dev);
 	if (!t) {

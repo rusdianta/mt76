@@ -116,7 +116,7 @@ void mt7603_pre_tbtt_tasklet(unsigned long arg)
 	mt76_queue_tx_cleanup(dev, MT_TXQ_CAB, false);
 	mt76_queue_tx_cleanup(dev, MT_TXQ_BEACON, false);
 
-	if (dev->mt76.q_tx[MT_TXQ_BEACON]->swq_queued > 0)
+	if (dev->mt76.q_tx[MT_TXQ_BEACON].q->queued > 0)
 		dev->beacon_check++;
 	else
 		dev->beacon_check = 0;

@@ -238,7 +238,7 @@ mt76_tx(struct mt76_dev *dev, struct ieee80211_sta *sta,
 	dev->queue_ops->tx_queue_skb(dev, qid, skb, wcid, sta);
 	dev->queue_ops->kick(dev, q);
 
-	if (q->queued > q->ndesc - 8 && !q->stopped) {
+	if (q->queued > q->ndesc - MT_TXQ_FREE_THR && !q->stopped) {
 		ieee80211_stop_queue(dev->hw, skb_get_queue_mapping(skb));
 		q->stopped = true;
 	}

@@ -802,7 +802,7 @@ static void mt76u_status_worker(struct mt76_worker *w)
 		sq->swq_queued -= n_sw_dequeued;
 		q->queued -= n_dequeued;
 
-		wake = q->stopped && q->queued < q->ndesc - 8;
+		wake = q->stopped && q->queued < q->ndesc - MT_TXQ_FREE_THR;
 		if (wake)
 			q->stopped = false;
 

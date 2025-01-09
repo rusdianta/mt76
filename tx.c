@@ -438,7 +438,7 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 		    test_bit(MT76_RESET, &dev->state))
 			return -EBUSY;
 
-		if (sq->stopped)
+		if (q->stopped)
 			break;
 
 		if (dev->queue_ops->tx_cleanup &&

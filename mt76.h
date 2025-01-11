@@ -952,7 +952,7 @@ mt76_tx_status_get_hw(struct mt76_dev *dev, struct sk_buff *skb)
 {
 	//struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	//u8 phy_idx = (info->hw_queue & MT_TX_HW_QUEUE_PHY) >> 2;
-	struct ieee80211_hw *hw = &dev->hw;
+	struct ieee80211_hw *hw = dev->hw;
 
 	info->hw_queue &= ~MT_TX_HW_QUEUE_PHY;
 

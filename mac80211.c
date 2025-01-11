@@ -366,6 +366,10 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 	int ret;
 
 	dev_set_drvdata(dev->dev, dev);
+	mt76_wcid_init(&dev->global_wcid);
+
+	INIT_LIST_HEAD(&dev->tx_list);
+	spin_lock_init(&dev->tx_lock);
 
 	SET_IEEE80211_DEV(hw, dev->dev);
 	SET_IEEE80211_PERM_ADDR(hw, dev->macaddr);
@@ -462,6 +466,7 @@ void mt76_unregister_device(struct mt76_dev *dev)
 	if (IS_ENABLED(CONFIG_MT76_LEDS))
 		mt76_led_cleanup(dev);
 	mt76_tx_status_check(dev, true);
+	mt76_wcid_cleanup(dev, &dev->global_wcid);
 	ieee80211_unregister_hw(hw);
 }
 EXPORT_SYMBOL_GPL(mt76_unregister_device);
@@ -1082,6 +1087,9 @@ EXPORT_SYMBOL_GPL(mt76_sta_pre_rcu_remove);
 
 void mt76_wcid_init(struct mt76_wcid *wcid)
 {
+	INIT_LIST_HEAD(&wcid->tx_list);
+	skb_queue_head_init(&wcid->tx_pending);
+
 	INIT_LIST_HEAD(&wcid->list);
 	idr_init(&wcid->pktid);
 }
@@ -1089,13 +1097,30 @@ EXPORT_SYMBOL_GPL(mt76_wcid_init);
 
 void mt76_wcid_cleanup(struct mt76_dev *dev, struct mt76_wcid *wcid)
 {
+	struct ieee80211_hw *hw;
 	struct sk_buff_head list;
+	struct sk_buff *skb;
 
 	mt76_tx_status_lock(dev, &list);
 	mt76_tx_status_skb_get(dev, wcid, -1, &list);
 	mt76_tx_status_unlock(dev, &list);
 
 	idr_destroy(&wcid->pktid);
+
+	spin_lock_bh(&dev->tx_lock);
+
+	if (!list_empty(&wcid->tx_list))
+		list_del_init(&wcid->tx_list);
+
+	spin_lock(&wcid->tx_pending.lock);
+	skb_queue_splice_tail_init(&wcid->tx_pending, &list);
+	spin_unlock(&wcid->tx_pending.lock);
+	spin_unlock_bh(&dev->tx_lock);
+
+	while ((skb = __skb_dequeue(&list)) != NULL) {
+		hw = mt76_tx_status_get_hw(dev, skb);
+		ieee80211_free_txskb(hw, skb);
+	}
 }
 EXPORT_SYMBOL_GPL(mt76_wcid_cleanup);
 

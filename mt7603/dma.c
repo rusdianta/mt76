@@ -220,6 +220,17 @@ int mt7603_dma_init(struct mt7603_dev *dev)
 	if (ret)
 		return ret;
 
+	// NOTE: Try add these to test if it is working
+	mt7603_irq_enable(dev,
+			  MT_INT_TX_DONE(IEEE80211_AC_VO) |
+			  MT_INT_TX_DONE(IEEE80211_AC_VI) |
+			  MT_INT_TX_DONE(IEEE80211_AC_BE) |
+			  MT_INT_TX_DONE(IEEE80211_AC_BK) |
+			  MT_INT_TX_DONE(MT_TX_HW_QUEUE_MGMT) |
+			  MT_INT_TX_DONE(MT_TX_HW_QUEUE_MCU) |
+			  MT_INT_TX_DONE(MT_TX_HW_QUEUE_BCN) |
+			  MT_INT_TX_DONE(MT_TX_HW_QUEUE_BMC));
+
 	ret = mt7603_init_rx_queue(dev, &dev->mt76.q_rx[MT_RXQ_MCU], 1,
 				   MT7603_MCU_RX_RING_SIZE, MT_RX_BUF_SIZE);
 	if (ret)

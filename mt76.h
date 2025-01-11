@@ -240,7 +240,14 @@ enum mt76_wcid_flags {
 
 #define MT76_N_WCIDS 128
 
+/* stored in ieee80211_tx_info::hw_queue */
+#define MT_TX_HW_QUEUE_PHY		GENMASK(3, 2)
+
 DECLARE_EWMA(signal, 10, 8);
+
+enum mt76_band_id {
+	MT_BAND0,
+};
 
 #define MT_WCID_TX_INFO_RATE		GENMASK(15, 0)
 #define MT_WCID_TX_INFO_NSS		GENMASK(17, 16)
@@ -269,6 +276,9 @@ struct mt76_wcid {
 
 	u32 tx_info;
 	bool sw_iv;
+
+	struct list_head tx_list;
+	struct sk_buff_head tx_pending;
 
 	struct list_head list;
 	struct idr pktid;
@@ -587,6 +597,9 @@ struct mt76_dev {
 
 	u32 rev;
 	unsigned long state;
+	
+	spinlock_t tx_lock;
+	struct list_head tx_list;
 
 	u32 aggr_stats[32];
 
@@ -932,6 +945,19 @@ void mt76_sw_scan_complete(struct ieee80211_hw *hw,
 			   struct ieee80211_vif *vif);
 u32 mt76_calc_tx_airtime(struct mt76_dev *dev, struct ieee80211_tx_info *info,
 			 int len);
+
+/* internal */
+static inline struct ieee80211_hw *
+mt76_tx_status_get_hw(struct mt76_dev *dev, struct sk_buff *skb)
+{
+	//struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+	//u8 phy_idx = (info->hw_queue & MT_TX_HW_QUEUE_PHY) >> 2;
+	struct ieee80211_hw *hw = &dev->hw;
+
+	info->hw_queue &= ~MT_TX_HW_QUEUE_PHY;
+
+	return hw;
+}
 
 /* internal */
 void mt76_put_txwi(struct mt76_dev *dev, struct mt76_txwi_cache *t);

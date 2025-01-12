@@ -708,6 +708,7 @@ const struct ieee80211_ops mt7603_ops = {
 	.get_antenna = mt76_get_antenna,
 };
 
+MODULE_DESCRIPTION("MediaTek MT7603E and MT76x8 wireless driver");
 MODULE_LICENSE("Dual BSD/GPL");
 
 static int __init mt7603_init(void)

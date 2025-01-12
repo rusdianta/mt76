@@ -1099,11 +1099,15 @@ EXPORT_SYMBOL_GPL(mt76_sta_pre_rcu_remove);
 
 void mt76_wcid_init(struct mt76_wcid *wcid)
 {
+	wcid->hw_key_idx = -1;
+
 	INIT_LIST_HEAD(&wcid->tx_list);
 	skb_queue_head_init(&wcid->tx_pending);
 
 	INIT_LIST_HEAD(&wcid->list);
 	idr_init(&wcid->pktid);
+
+	INIT_LIST_HEAD(&wcid->poll_list);
 }
 EXPORT_SYMBOL_GPL(mt76_wcid_init);
 

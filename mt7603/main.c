@@ -146,6 +146,7 @@ mt7603_set_channel(struct mt7603_dev *dev, struct cfg80211_chan_def *def)
 
 	mutex_lock(&dev->mt76.mutex);
 	set_bit(MT76_RESET, &dev->mt76.state);
+	mt76_worker_disable(&dev->tx_worker);
 
 	mt7603_beacon_set_timer(dev, -1, 0);
 	mt76_set_channel(&dev->mt76);
@@ -179,6 +180,7 @@ mt7603_set_channel(struct mt7603_dev *dev, struct cfg80211_chan_def *def)
 	mt7603_mac_start(dev);
 
 	clear_bit(MT76_RESET, &dev->mt76.state);
+	mt76_worker_enable(&dev->tx_worker);
 
 	mt76_txq_schedule_all(&dev->mt76);
 

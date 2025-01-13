@@ -339,7 +339,6 @@ s8 mt76_get_rate_power_limits(struct mt76_dev *dev,
 	const __be32 *val;
 	char name[16];
 	u32 mcs_rates = dev->drv->mcs_rates;
-	u32 ru_rates = ARRAY_SIZE(dest->ru[0]);
 	char band;
 	size_t len;
 	s8 max_power = 0;
@@ -393,7 +392,7 @@ s8 mt76_get_rate_power_limits(struct mt76_dev *dev,
 				     ARRAY_SIZE(dest->mcs), val, len,
 				     target_power, txs_delta, &max_power);
 
-	val = mt76_get_of_array(np, "rates-ru", &len, ru_rates + 1);
+	val = mt76_get_of_array(np, "rates-ru", &len, ARRAY_SIZE(dest->ru[0]) + 1);
 	mt76_apply_multi_array_limit(dest->ru[0], ARRAY_SIZE(dest->ru[0]),
 				     ARRAY_SIZE(dest->ru), val, len,
 				     target_power, txs_delta, &max_power);

@@ -215,8 +215,7 @@ u32 mt76_calc_rx_airtime(struct mt76_dev *dev, struct mt76_rx_status *status,
 {
 	struct ieee80211_supported_band *sband;
 	const struct ieee80211_rate *rate;	
-	bool sp = status->enc_flags & RX_ENC_FLAG_SHORTPRE;
-	bool sgi = status->enc_flags & RX_ENC_FLAG_SHORT_GI;
+	bool sp, sgi;
 	int bw, streams, idx, group;
 	u32 duration;
 
@@ -234,6 +233,9 @@ u32 mt76_calc_rx_airtime(struct mt76_dev *dev, struct mt76_rx_status *status,
 		WARN_ON_ONCE(1);
 		return 0;
 	}
+
+	sp = status->enc_flags & RX_ENC_FLAG_SHORTPRE;
+	sgi = status->enc_flags & RX_ENC_FLAG_SHORT_GI;
 
 	switch (status->encoding) {
 	case RX_ENC_LEGACY:

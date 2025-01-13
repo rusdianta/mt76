@@ -390,13 +390,14 @@ static int
 mt76_dma_tx_queue_skb_raw(struct mt76_dev *dev, enum mt76_txq_id qid,
 			  struct sk_buff *skb, u32 tx_info)
 {
-	struct mt76_queue *q = dev->q_tx[qid].q;
+	struct mt76_queue *q;
 	struct mt76_queue_buf buf = {};
 	dma_addr_t addr;
 
 	if (test_bit(MT76_MCU_RESET, &dev->state))
 		goto error;
 
+	q = dev->q_tx[qid].q;
 	if (q->queued + 1 >= q->ndesc - 1)
 		goto error;
 
@@ -425,7 +426,7 @@ mt76_dma_tx_queue_skb(struct mt76_dev *dev, enum mt76_txq_id qid,
 		      struct sk_buff *skb, struct mt76_wcid *wcid,
 		      struct ieee80211_sta *sta)
 {
-	struct mt76_queue *q = dev->q_tx[qid].q;
+	struct mt76_queue *q;
 	struct mt76_tx_info tx_info = {
 		.skb = skb,
 	};
@@ -473,6 +474,7 @@ mt76_dma_tx_queue_skb(struct mt76_dev *dev, enum mt76_txq_id qid,
 	}
 	tx_info.nbuf = n;
 
+	q = dev->q_tx[qid].q;
 	if (q->queued + (tx_info.nbuf + 1) / 2 >= q->ndesc - 1) {
 		ret = -ENOMEM;
 		goto unmap;
@@ -503,14 +505,17 @@ free:
 static int
 mt76_dma_rx_fill(struct mt76_dev *dev, struct mt76_queue *q)
 {
-	int len = SKB_WITH_OVERHEAD(q->buf_size);
-	int frames = 0, offset = q->buf_offset;
+	int len;
+	int frames = 0, offset;
 	dma_addr_t addr;
 
 	if (!q->ndesc)
 		return 0;
 
 	spin_lock_bh(&q->lock);
+
+	len = SKB_WITH_OVERHEAD(q->buf_size);
+	offset = q->buf_offset;
 
 	while (q->queued < q->ndesc - 1) {
 		struct mt76_queue_buf qbuf;

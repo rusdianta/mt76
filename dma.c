@@ -150,11 +150,11 @@ static int
 mt76_dma_add_rx_buf(struct mt76_dev *dev, struct mt76_queue *q,
 		    struct mt76_queue_buf *buf, void *data)
 {
-	struct mt76_desc *desc = &q->desc[q->head];
-	struct mt76_queue_entry *entry = &q->entry[q->head];
-	struct mt76_txwi_cache *txwi = NULL;
-	u32 buf1 = 0, ctrl;
 	int idx = q->head;
+	struct mt76_desc *desc = &q->desc[idx];
+	struct mt76_queue_entry *entry = &q->entry[idx];
+	struct mt76_txwi_cache *txwi = NULL;
+	u32 buf1 = 0, ctrl;	
 
 	ctrl = FIELD_PREP(MT_DMA_CTL_SD_LEN0, buf[0].len);
 	
@@ -168,7 +168,7 @@ mt76_dma_add_rx_buf(struct mt76_dev *dev, struct mt76_queue *q,
 	entry->txwi = txwi;
 	entry->buf = data;
 	entry->skip_buf1 = true;
-	q->head = (q->head + 1) % q->ndesc;
+	q->head = (idx + 1) % q->ndesc;
 	q->queued++;
 
 	return idx;
@@ -181,19 +181,21 @@ mt76_dma_add_buf(struct mt76_dev *dev, struct mt76_queue *q,
 {
 	struct mt76_queue_entry *entry;
 	struct mt76_desc *desc;
-	int i, idx = -1;
+	int i, idx;
 	u32 ctrl, next;	
 
 	if (txwi) {
-		q->entry[q->head].txwi = DMA_DUMMY_DATA;
-		q->entry[q->head].skip_buf0 = true;
+		idx = q->head;
+		q->entry[idx].txwi = DMA_DUMMY_DATA;
+		q->entry[idx].skip_buf0 = true;
 	}
 
+	idx = -1;
 	for (i = 0; i < nbufs; i += 2, buf += 2) {
 		u32 buf0 = buf[0].addr, buf1 = 0;
 
 		idx = q->head;
-		next = (q->head + 1) % q->ndesc;
+		next = (idx + 1) % q->ndesc;
 
 		desc = &q->desc[idx];
 		entry = &q->entry[idx];
@@ -378,7 +380,7 @@ mt76_dma_dequeue(struct mt76_dev *dev, struct mt76_queue *q, bool flush,
 	else if (!(q->desc[idx].ctrl & cpu_to_le32(MT_DMA_CTL_DMA_DONE)))
 		return NULL;
 
-	q->tail = (q->tail + 1) % q->ndesc;
+	q->tail = (idx + 1) % q->ndesc;
 	q->queued--;
 
 	return mt76_dma_get_buf(dev, q, idx, len, info, more);

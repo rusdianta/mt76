@@ -252,9 +252,10 @@ static void mt76_rx_aggr_shutdown(struct mt76_dev *dev, struct mt76_rx_tid *tid)
 	spin_lock_bh(&tid->lock);
 	tid->stopped = true;
 
-	u16 size = tid->size;
 	int i;
+	u16 size;
 
+	size =  = tid->size;
 	for (i = 0; tid->nframes && i < size; i++) {
 		struct sk_buff *skb = tid->reorder_buf[i];
 

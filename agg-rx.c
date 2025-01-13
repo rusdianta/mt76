@@ -15,9 +15,11 @@ static unsigned long mt76_aggr_tid_to_timeo(u8 tidno)
 static void
 mt76_aggr_release(struct mt76_rx_tid *tid, struct sk_buff_head *frames, int idx)
 {
+	struct sk_buff *skb;
+
 	tid->head = ieee80211_sn_inc(tid->head);
 
-	struct sk_buff *skb = tid->reorder_buf[idx];
+	skb = tid->reorder_buf[idx];
 	if (!skb)
 		return;
 
@@ -31,8 +33,10 @@ mt76_rx_aggr_release_frames(struct mt76_rx_tid *tid,
 			    struct sk_buff_head *frames,
 			    u16 head)
 {
+	int idx;
+
 	while (ieee80211_sn_less(tid->head, head)) {
-		int idx = tid->head % tid->size;
+		idx = tid->head % tid->size;
 		mt76_aggr_release(tid, frames, idx);
 	}
 }
@@ -51,24 +55,27 @@ mt76_rx_aggr_release_head(struct mt76_rx_tid *tid, struct sk_buff_head *frames)
 static void
 mt76_rx_aggr_check_release(struct mt76_rx_tid *tid, struct sk_buff_head *frames)
 {
+	struct sk_buff *skb;
+	struct mt76_rx_status *status;
+	int start, nframes, idx;
+
 	if (!tid->nframes)
 		return;
 
 	mt76_rx_aggr_release_head(tid, frames);
 
-	int start = tid->head % tid->size;
-	int nframes = tid->nframes;
-	int idx;
+	start = tid->head % tid->size;
+	nframes = tid->nframes;
 
 	for (idx = (tid->head + 1) % tid->size;
 	     idx != start && nframes;
 	     idx = (idx + 1) % tid->size) {
-		struct sk_buff *skb = tid->reorder_buf[idx];
+		skb = tid->reorder_buf[idx];
 		if (!skb)
 			continue;
 
 		nframes--;
-		struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
+		status = (struct mt76_rx_status *)skb->cb;
 		if (!time_after32(jiffies,
 				  status->reorder_time +
 				  mt76_aggr_tid_to_timeo(tid->num)))
@@ -85,7 +92,10 @@ mt76_rx_aggr_reorder_work(struct work_struct *work)
 {
 	struct mt76_rx_tid *tid = container_of(work, struct mt76_rx_tid,
 					       reorder_work.work);
+	struct mt76_dev *dev = tid->dev;
 	struct sk_buff_head frames;
+	int nframes;
+
 	__skb_queue_head_init(&frames);
 
 	local_bh_disable();
@@ -93,10 +103,9 @@ mt76_rx_aggr_reorder_work(struct work_struct *work)
 
 	spin_lock(&tid->lock);
 	mt76_rx_aggr_check_release(tid, &frames);
-	int nframes = tid->nframes;
+	nframes = tid->nframes;
 	spin_unlock(&tid->lock);
 
-	struct mt76_dev *dev = tid->dev;
 	if (nframes)
 		ieee80211_queue_delayed_work(dev->hw, &tid->reorder_work,
 					     mt76_aggr_tid_to_timeo(tid->num));
@@ -110,6 +119,11 @@ static void
 mt76_rx_aggr_check_ctl(struct sk_buff *skb, struct sk_buff_head *frames)
 {
 	struct ieee80211_bar *bar = mt76_skb_get_hdr(skb);
+	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
+	struct mt76_wcid *wcid = status->wcid;
+	struct mt76_rx_tid *tid;
+	u8 tidno;
+	u16 seqno;
 
 	if (!ieee80211_is_ctl(bar->frame_control))
 		return;
@@ -117,18 +131,14 @@ mt76_rx_aggr_check_ctl(struct sk_buff *skb, struct sk_buff_head *frames)
 	if (!ieee80211_is_back_req(bar->frame_control))
 		return;
 
-	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
-	struct mt76_wcid *wcid = status->wcid
-	u8 tidno;
-
 	status->qos_ctl = tidno = le16_to_cpu(bar->control) >> 12;
-	struct mt76_rx_tid *tid = rcu_dereference(wcid->aggr[tidno]);
+	tid = rcu_dereference(wcid->aggr[tidno]);
 	if (!tid)
 		return;
 
 	spin_lock_bh(&tid->lock);
 	if (!tid->stopped) {
-		u16 seqno = IEEE80211_SEQ_TO_SN(le16_to_cpu(bar->start_seq_num));
+		seqno = IEEE80211_SEQ_TO_SN(le16_to_cpu(bar->start_seq_num));
 		mt76_rx_aggr_release_frames(tid, frames, seqno);
 		mt76_rx_aggr_release_head(tid, frames);
 	}
@@ -137,12 +147,17 @@ mt76_rx_aggr_check_ctl(struct sk_buff *skb, struct sk_buff_head *frames)
 
 void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 {
-	__skb_queue_tail(frames, skb);
-
 	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
 	struct mt76_wcid *wcid = status->wcid;
-	struct ieee80211_sta *sta = wcid_to_sta(wcid);
+	struct ieee80211_sta *sta;
+	struct mt76_rx_tid *tid;
+	u8 ackp, tidno;
+	u16 head, seqno, size, idx;
+	bool sn_less;
 
+	__skb_queue_tail(frames, skb);
+
+	sta = wcid_to_sta(wcid);
 	if (!sta)
 		return;
 
@@ -153,12 +168,12 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	}
 
 	/* not part of a BA session */
-	u8 ackp = status->qos_ctl & IEEE80211_QOS_CTL_ACK_POLICY_MASK;
+	ackp = status->qos_ctl & IEEE80211_QOS_CTL_ACK_POLICY_MASK;
 	if (ackp == IEEE80211_QOS_CTL_ACK_POLICY_NOACK)
 		return;
 
-	u8 tidno = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
-	struct mt76_rx_tid *tid = rcu_dereference(wcid->aggr[tidno]);
+	tidno = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
+	tid = rcu_dereference(wcid->aggr[tidno]);
 	if (!tid)
 		return;
 
@@ -168,9 +183,9 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	if (tid->stopped)
 		goto out;
 
-	u16 head = tid->head;
-	u16 seqno = status->seqno;
-	bool sn_less = ieee80211_sn_less(seqno, head);
+	head = tid->head;
+	seqno = status->seqno;
+	sn_less = ieee80211_sn_less(seqno, head);
 
 	if (!tid->started) {
 		if (sn_less)
@@ -179,7 +194,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 		tid->started = true;
 	}
 
-	u16 size = tid->size;
+	size = tid->size;
 
 	if (sn_less) {
 		__skb_unlink(skb, frames);
@@ -205,7 +220,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 		mt76_rx_aggr_release_frames(tid, frames, head);
 	}
 
-	u16 idx = seqno % size;
+	idx = seqno % size;
 
 	/* Discard if the current slot is already in use */
 	if (tid->reorder_buf[idx]) {
@@ -228,9 +243,11 @@ out:
 int mt76_rx_aggr_start(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tidno,
 		       u16 ssn, u16 size)
 {
+	struct mt76_rx_tid *tid;
+
 	mt76_rx_aggr_stop(dev, wcid, tidno);
 
-	struct mt76_rx_tid *tid = kzalloc(struct_size(tid, reorder_buf, size), GFP_KERNEL);
+	tid = kzalloc(struct_size(tid, reorder_buf, size), GFP_KERNEL);
 	if (!tid)
 		return -ENOMEM;
 
@@ -249,13 +266,12 @@ EXPORT_SYMBOL_GPL(mt76_rx_aggr_start);
 
 static void mt76_rx_aggr_shutdown(struct mt76_dev *dev, struct mt76_rx_tid *tid)
 {
-	spin_lock_bh(&tid->lock);
-	tid->stopped = true;
-
+	u16 size = tid->size;
 	int i;
-	u16 size;
 
-	size = tid->size;
+	spin_lock_bh(&tid->lock);
+
+	tid->stopped = true;
 	for (i = 0; tid->nframes && i < size; i++) {
 		struct sk_buff *skb = tid->reorder_buf[i];
 

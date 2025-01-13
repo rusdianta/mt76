@@ -107,13 +107,14 @@ static inline u64 ktime_get_boottime_ns_dev(void)
 
 static int mt76_led_init(struct mt76_dev *dev)
 {
-	struct device_node *np = dev->dev->of_node;
-	struct ieee80211_hw *hw = dev->hw;
+	struct device_node *np;
+	struct ieee80211_hw *hw;
 	int led_pin;
 
 	if (!dev->leds.cdev.brightness_set && !dev->leds.cdev.blink_set)
 		return 0;
 
+	np = dev->dev->of_node;
 	np = of_get_child_by_name(np, "led");
 	if (np) {
 		if (!of_device_is_available(np)) {
@@ -129,6 +130,7 @@ static int mt76_led_init(struct mt76_dev *dev)
 		of_node_put(np);
 	}
 
+	hw = dev->hw;
 	snprintf(dev->leds.name, sizeof(dev->leds.name),
 		 "mt76-%s", wiphy_name(hw->wiphy));
 
@@ -209,7 +211,7 @@ mt76_init_sband(struct mt76_dev *dev, struct mt76_sband *msband,
 		const struct ieee80211_channel *chan, int n_chan,
 		struct ieee80211_rate *rates, int n_rates, bool vht)
 {
-	struct ieee80211_supported_band *sband = &msband->sband;
+	struct ieee80211_supported_band *sband;
 	struct ieee80211_sta_ht_cap *ht_cap;
 	struct ieee80211_sta_vht_cap *vht_cap;
 	void *chanlist;
@@ -225,6 +227,7 @@ mt76_init_sband(struct mt76_dev *dev, struct mt76_sband *msband,
 	if (!msband->chan)
 		return -ENOMEM;
 
+	sband = &msband->sband;
 	sband->channels = chanlist;
 	sband->n_channels = n_chan;
 	sband->bitrates = rates;
@@ -286,7 +289,6 @@ static void
 mt76_check_sband(struct mt76_dev *dev, int band)
 {
 	struct ieee80211_supported_band *sband = dev->hw->wiphy->bands[band];
-	bool found = false;
 	int i;
 
 	if (!sband)
@@ -296,12 +298,9 @@ mt76_check_sband(struct mt76_dev *dev, int band)
 		if (sband->channels[i].flags & IEEE80211_CHAN_DISABLED)
 			continue;
 
-		found = true;
-		break;
-	}
-
-	if (found)
+		// if found then return
 		return;
+	}
 
 	sband->n_channels = 0;
 	dev->hw->wiphy->bands[band] = NULL;
@@ -459,7 +458,7 @@ EXPORT_SYMBOL_GPL(mt76_register_device);
 
 void mt76_unregister_device(struct mt76_dev *dev)
 {
-	struct ieee80211_hw *hw = dev->hw;
+	struct ieee80211_hw *hw;
 
 	if (!test_bit(MT76_STATE_REGISTERED, &dev->state))
 		return;
@@ -468,6 +467,8 @@ void mt76_unregister_device(struct mt76_dev *dev)
 		mt76_led_cleanup(dev);
 	mt76_tx_status_check(dev, true);
 	mt76_wcid_cleanup(dev, &dev->global_wcid);
+
+	hw = dev->hw;
 	ieee80211_unregister_hw(hw);
 }
 EXPORT_SYMBOL_GPL(mt76_unregister_device);
@@ -526,7 +527,7 @@ mt76_channel_state(struct mt76_dev *dev, struct ieee80211_channel *c)
 
 void mt76_update_survey(struct mt76_dev *dev)
 {
-	struct mt76_channel_state *state = dev->chan_state;
+	struct mt76_channel_state *state;
 	ktime_t cur_time;
 
 	if (!test_bit(MT76_STATE_RUNNING, &dev->state))
@@ -536,6 +537,7 @@ void mt76_update_survey(struct mt76_dev *dev)
 		dev->drv->update_survey(dev);
 
 	cur_time = ktime_get_boottime();
+	state = dev->chan_state;
 	state->cc_active += ktime_to_us(ktime_sub(cur_time,
 						  dev->survey_time));
 	dev->survey_time = cur_time;
@@ -690,7 +692,7 @@ EXPORT_SYMBOL(mt76_rx_signal);
 static struct ieee80211_sta *mt76_rx_convert(struct sk_buff *skb)
 {
 	struct ieee80211_rx_status *status = IEEE80211_SKB_RXCB(skb);
-	struct ieee80211_hdr *hdr = mt76_skb_get_hdr(skb);
+	struct ieee80211_hdr *hdr;
 	struct mt76_rx_status mstat;
 
 	mstat = *((struct mt76_rx_status *)skb->cb);
@@ -716,6 +718,7 @@ static struct ieee80211_sta *mt76_rx_convert(struct sk_buff *skb)
 	if (status->signal <= -128)
 		status->flag |= RX_FLAG_NO_SIGNAL_VAL;
 
+	hdr = mt76_skb_get_hdr(skb);
 	if (ieee80211_is_beacon(hdr->frame_control) ||
 	    ieee80211_is_probe_resp(hdr->frame_control))
 		status->boottime_ns = ktime_get_boottime_ns_dev();
@@ -733,7 +736,7 @@ static void
 mt76_check_ccmp_pn(struct sk_buff *skb)
 {
 	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
-	struct mt76_wcid *wcid = status->wcid;
+	struct mt76_wcid *wcid;
 	struct ieee80211_hdr *hdr;
 	int security_idx;
 	int ret;
@@ -744,6 +747,7 @@ mt76_check_ccmp_pn(struct sk_buff *skb)
 	if (status->flag & RX_FLAG_ONLY_MONITOR)
 		return;
 
+	wcid = status->wcid;
 	if (!wcid || !wcid->rx_check_pn)
 		return;
 
@@ -791,19 +795,21 @@ static void
 mt76_airtime_report(struct mt76_dev *dev, struct mt76_rx_status *status,
 		    int len)
 {
-	struct mt76_wcid *wcid = status->wcid;
+	struct mt76_wcid *wcid;
 	struct ieee80211_sta *sta;
 	u32 airtime;
-	u8 tidno = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
+	u8 tidno;
 
 	airtime = mt76_calc_rx_airtime(dev, status, len);
 	spin_lock(&dev->cc_lock);
 	dev->cur_cc_bss_rx += airtime;
 	spin_unlock(&dev->cc_lock);
 
+	wcid = status->wcid;
 	if (!wcid || !wcid->sta)
 		return;
 
+	tidno = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
 	sta = container_of((void *)wcid, struct ieee80211_sta, drv_priv);
 	ieee80211_sta_register_airtime(sta, tidno, 0, airtime);
 }
@@ -833,11 +839,14 @@ mt76_airtime_flush_ampdu(struct mt76_dev *dev)
 static void
 mt76_airtime_check(struct mt76_dev *dev, struct sk_buff *skb)
 {
-	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
-	struct mt76_wcid *wcid = status->wcid;
+	struct mt76_rx_status *status;
+	struct mt76_wcid *wcid;
 
 	if (!(dev->drv->drv_flags & MT_DRV_SW_RX_AIRTIME))
 		return;
+
+	status = (struct mt76_rx_status *)skb->cb;
+	wcid = status->wcid;
 
 	if (!wcid || !wcid->sta) {		
 		struct ieee80211_hdr *hdr = mt76_skb_get_hdr(skb);
@@ -877,7 +886,7 @@ mt76_check_sta(struct mt76_dev *dev, struct sk_buff *skb)
 	struct ieee80211_hdr *hdr = mt76_skb_get_hdr(skb);
 	struct ieee80211_sta *sta;
 	struct mt76_wcid *wcid = status->wcid;
-	u8 tidno = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
+	u8 tidno;
 	bool ps;
 	int i;
 
@@ -917,6 +926,7 @@ mt76_check_sta(struct mt76_dev *dev, struct sk_buff *skb)
 		return;
 
 	ps = ieee80211_has_pm(hdr->frame_control);
+	tidno = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
 
 	if (ps && (ieee80211_is_data_qos(hdr->frame_control) ||
 		   ieee80211_is_qos_nullfunc(hdr->frame_control)))
@@ -987,7 +997,7 @@ static int
 mt76_sta_add(struct mt76_dev *dev, struct ieee80211_vif *vif,
 	     struct ieee80211_sta *sta)
 {
-	struct mt76_wcid *wcid = (struct mt76_wcid *)sta->drv_priv;
+	struct mt76_wcid *wcid;
 	int ret;
 	int i;
 
@@ -996,6 +1006,8 @@ mt76_sta_add(struct mt76_dev *dev, struct ieee80211_vif *vif,
 	ret = dev->drv->sta_add(dev, vif, sta);
 	if (ret)
 		goto out;
+
+	wcid =  = (struct mt76_wcid *)sta->drv_priv;
 
 	for (i = 0; i < ARRAY_SIZE(sta->txq); i++) {
 		struct mt76_txq *mtxq;

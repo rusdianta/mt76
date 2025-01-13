@@ -15,11 +15,9 @@ static unsigned long mt76_aggr_tid_to_timeo(u8 tidno)
 static void
 mt76_aggr_release(struct mt76_rx_tid *tid, struct sk_buff_head *frames, int idx)
 {
-	struct sk_buff *skb;
-
 	tid->head = ieee80211_sn_inc(tid->head);
 
-	skb = tid->reorder_buf[idx];
+	struct sk_buff *skb = tid->reorder_buf[idx];
 	if (!skb)
 		return;
 
@@ -185,6 +183,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 
 	head = tid->head;
 	seqno = status->seqno;
+	size = tid->size;
 	sn_less = ieee80211_sn_less(seqno, head);
 
 	if (!tid->started) {
@@ -193,8 +192,6 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 
 		tid->started = true;
 	}
-
-	size = tid->size;
 
 	if (sn_less) {
 		__skb_unlink(skb, frames);

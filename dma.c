@@ -102,10 +102,10 @@ mt76_dma_sync_idx(struct mt76_dev *dev, struct mt76_queue *q)
 static void
 mt76_dma_queue_reset(struct mt76_dev *dev, struct mt76_queue *q)
 {
-	int i;
-
 	if (!q || !q->ndesc)
 		return;
+
+	int i;
 
 	/* clear descriptors */
 	for (i = 0; i < q->ndesc; i++)
@@ -182,7 +182,7 @@ mt76_dma_add_buf(struct mt76_dev *dev, struct mt76_queue *q,
 	struct mt76_queue_entry *entry;
 	struct mt76_desc *desc;
 	int i, idx;
-	u32 ctrl, next;	
+	u32 ctrl, next;
 
 	if (txwi) {
 		idx = q->head;
@@ -591,10 +591,11 @@ static void
 mt76_dma_rx_reset(struct mt76_dev *dev, enum mt76_rxq_id qid)
 {
 	struct mt76_queue *q = &dev->q_rx[qid];
-	int i;
 
 	if (!q->ndesc)
 		return;
+
+	int i;
 
 	for (i = 0; i < q->ndesc; i++)
 		q->desc[i].ctrl = cpu_to_le32(MT_DMA_CTL_DMA_DONE);

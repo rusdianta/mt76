@@ -288,10 +288,10 @@ static void
 mt76_apply_array_limit(s8 *pwr, size_t pwr_len, const __be32 *data,
 		       s8 target_power, s8 nss_delta, s8 *max_power)
 {
-	int i;
-
 	if (!data)
 		return;
+
+	int i;
 
 	for (i = 0; i < pwr_len; i++) {
 		pwr[i] = min_t(s8, target_power,
@@ -305,10 +305,10 @@ mt76_apply_multi_array_limit(s8 *pwr, size_t pwr_len, s8 pwr_num,
 			     const __be32 *data, size_t len, s8 target_power,
 			     s8 nss_delta, s8 *max_power)
 {
-	int i, cur;
-
 	if (!data)
 		return;
+
+	int i, cur;
 
 	len /= 4;
 	cur = be32_to_cpu(data[0]);

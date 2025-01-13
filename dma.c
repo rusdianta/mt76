@@ -102,10 +102,10 @@ mt76_dma_sync_idx(struct mt76_dev *dev, struct mt76_queue *q)
 static void
 mt76_dma_queue_reset(struct mt76_dev *dev, struct mt76_queue *q)
 {
+	int i;
+
 	if (!q || !q->ndesc)
 		return;
-
-	int i;
 
 	/* clear descriptors */
 	for (i = 0; i < q->ndesc; i++)
@@ -591,11 +591,10 @@ static void
 mt76_dma_rx_reset(struct mt76_dev *dev, enum mt76_rxq_id qid)
 {
 	struct mt76_queue *q = &dev->q_rx[qid];
+	int i;
 
 	if (!q->ndesc)
-		return;
-
-	int i;
+		return;	
 
 	for (i = 0; i < q->ndesc; i++)
 		q->desc[i].ctrl = cpu_to_le32(MT_DMA_CTL_DMA_DONE);

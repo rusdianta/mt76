@@ -15,9 +15,11 @@ static unsigned long mt76_aggr_tid_to_timeo(u8 tidno)
 static void
 mt76_aggr_release(struct mt76_rx_tid *tid, struct sk_buff_head *frames, int idx)
 {
+	struct sk_buff *skb;
+
 	tid->head = ieee80211_sn_inc(tid->head);
 
-	struct sk_buff *skb = tid->reorder_buf[idx];
+	skb = tid->reorder_buf[idx];
 	if (!skb)
 		return;
 
@@ -117,8 +119,8 @@ static void
 mt76_rx_aggr_check_ctl(struct sk_buff *skb, struct sk_buff_head *frames)
 {
 	struct ieee80211_bar *bar = mt76_skb_get_hdr(skb);
-	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
-	struct mt76_wcid *wcid = status->wcid;
+	struct mt76_rx_status *status;
+	struct mt76_wcid *wcid;
 	struct mt76_rx_tid *tid;
 	u8 tidno;
 	u16 seqno;
@@ -129,7 +131,9 @@ mt76_rx_aggr_check_ctl(struct sk_buff *skb, struct sk_buff_head *frames)
 	if (!ieee80211_is_back_req(bar->frame_control))
 		return;
 
+	status = (struct mt76_rx_status *)skb->cb;
 	status->qos_ctl = tidno = le16_to_cpu(bar->control) >> 12;
+	wcid = status->wcid;
 	tid = rcu_dereference(wcid->aggr[tidno]);
 	if (!tid)
 		return;
@@ -145,8 +149,8 @@ mt76_rx_aggr_check_ctl(struct sk_buff *skb, struct sk_buff_head *frames)
 
 void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 {
-	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
-	struct mt76_wcid *wcid = status->wcid;
+	struct mt76_rx_status *status;
+	struct mt76_wcid *wcid;
 	struct ieee80211_sta *sta;
 	struct mt76_rx_tid *tid;
 	u8 ackp, tidno;
@@ -155,6 +159,8 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 
 	__skb_queue_tail(frames, skb);
 
+	status = (struct mt76_rx_status *)skb->cb;
+	wcid = status->wcid;
 	sta = wcid_to_sta(wcid);
 	if (!sta)
 		return;
@@ -183,7 +189,6 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 
 	head = tid->head;
 	seqno = status->seqno;
-	size = tid->size;
 	sn_less = ieee80211_sn_less(seqno, head);
 
 	if (!tid->started) {
@@ -212,6 +217,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	 * Frame sequence number exceeds buffering window, free up some space
 	 * by releasing previous frames
 	 */
+	size = tid->size;
 	if (!ieee80211_sn_less(seqno, head + size)) {
 		head = ieee80211_sn_inc(ieee80211_sn_sub(seqno, size));
 		mt76_rx_aggr_release_frames(tid, frames, head);
@@ -263,12 +269,14 @@ EXPORT_SYMBOL_GPL(mt76_rx_aggr_start);
 
 static void mt76_rx_aggr_shutdown(struct mt76_dev *dev, struct mt76_rx_tid *tid)
 {
-	u16 size = tid->size;
+	u16 size;
 	int i;
 
 	spin_lock_bh(&tid->lock);
 
 	tid->stopped = true;
+	size = tid->size;
+
 	for (i = 0; tid->nframes && i < size; i++) {
 		struct sk_buff *skb = tid->reorder_buf[i];
 

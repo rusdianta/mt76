@@ -250,8 +250,8 @@ EXPORT_SYMBOL_GPL(mt76_rx_aggr_start);
 static void mt76_rx_aggr_shutdown(struct mt76_dev *dev, struct mt76_rx_tid *tid)
 {
 	spin_lock_bh(&tid->lock);
-
 	tid->stopped = true;
+
 	u16 size = tid->size;
 	int i;
 

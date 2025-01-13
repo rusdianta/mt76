@@ -1007,7 +1007,7 @@ mt76_sta_add(struct mt76_dev *dev, struct ieee80211_vif *vif,
 	if (ret)
 		goto out;
 
-	wcid =  = (struct mt76_wcid *)sta->drv_priv;
+	wcid = (struct mt76_wcid *)sta->drv_priv;
 
 	for (i = 0; i < ARRAY_SIZE(sta->txq); i++) {
 		struct mt76_txq *mtxq;

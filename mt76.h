@@ -147,7 +147,16 @@ struct mt76_queue_entry {
 	bool done:1;
 };
 
+struct mt76_queue_regs {
+    u32 desc_base;
+    u32 ring_size;
+    u32 cpu_idx;
+    u32 dma_idx;
+} __packed __aligned(4);
+
 struct mt76_queue {
+	struct mt76_queue_regs __iomem *regs;
+
 	spinlock_t lock;
 	spinlock_t cleanup_lock;
 	struct mt76_queue_entry *entry;

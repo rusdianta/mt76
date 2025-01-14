@@ -681,8 +681,10 @@ extern struct ieee80211_rate mt76_rates[12];
 #define mt76_rmw_field(_dev, _reg, _field, _val)	\
 	mt76_rmw(_dev, _reg, _field, FIELD_PREP(_field, _val))
 
-// #define __mt76_rmw_field(_dev, _reg, _field, _val)	\
-// 	__mt76_rmw(_dev, _reg, _field, FIELD_PREP(_field, _val))
+/*
+#define __mt76_rmw_field(_dev, _reg, _field, _val)	\
+ 	__mt76_rmw(_dev, _reg, _field, FIELD_PREP(_field, _val))
+*/
 
 #define mt76_hw(dev) (dev)->mt76.hw
 

@@ -567,7 +567,7 @@ struct mt76_dev {
 	unsigned long wcid_mask[MT76_N_WCIDS / BITS_PER_LONG];
 
 	struct mt76_wcid global_wcid;
-	// struct mt76_wcid __rcu *wcid[MT76_N_WCIDS];
+	struct mt76_wcid __rcu *wcid[MT76_N_WCIDS];
 	struct list_head wcid_list;
 
 	u8 macaddr[ETH_ALEN];

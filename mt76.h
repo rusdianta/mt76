@@ -257,6 +257,8 @@ enum mt76_band_id {
 #define MT_WCID_TX_INFO_SET		BIT(31)
 
 struct mt76_wcid {
+    struct mt76_rx_tid __rcu *aggr[IEEE80211_NUM_TIDS];
+
 	unsigned long flags;
 
 	struct ewma_signal rssi;
@@ -298,6 +300,8 @@ struct mt76_txwi_cache {
 };
 
 struct mt76_rx_tid {
+	struct rcu_head rcu_head;
+
 	struct mt76_dev *dev;
 
 	spinlock_t lock;

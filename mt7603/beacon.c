@@ -35,7 +35,7 @@ mt7603_update_beacon_iter(void *priv, u8 *mac, struct ieee80211_vif *vif)
 	u32 om_idx = mvif->idx;
 	u32 val;
 
-	if (!(dev->mt76.beacon_mask & BIT(mvif->idx)))
+	if (!(dev->mt76.beacon_mask & BIT(om_idx)))
 		return;
 
 	skb = ieee80211_beacon_get(mt76_hw(dev), vif);
@@ -176,7 +176,7 @@ void mt7603_pre_tbtt_tasklet(unsigned long arg)
 
 void mt7603_beacon_set_timer(struct mt7603_dev *dev, int idx, int intval)
 {
-	u32 pre_tbtt = MT7603_PRE_TBTT_TIME / 64;
+	u32 pre_tbtt;
 
 	if (idx >= 0) {
 		if (intval)
@@ -204,6 +204,7 @@ void mt7603_beacon_set_timer(struct mt7603_dev *dev, int idx, int intval)
 	mt76_clear(dev, MT_ARB_SCR, MT_ARB_SCR_TBTT_BCN_PRIO);
 	mt76_set(dev, MT_ARB_SCR, MT_ARB_SCR_TBTT_BCAST_PRIO);
 
+	pre_tbtt = MT7603_PRE_TBTT_TIME / 64;
 	mt76_wr(dev, MT_PRE_TBTT, pre_tbtt);
 
 	mt76_set(dev, MT_HW_INT_MASK(3),

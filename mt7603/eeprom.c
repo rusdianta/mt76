@@ -102,9 +102,8 @@ mt7603_apply_cal_free_data(struct mt7603_dev *dev, u8 *efuse)
 		MT_EE_TX_POWER_1_START_2G + 1,
 	};
 	struct device_node *np = dev->mt76.dev->of_node;
-	u8 *eeprom = dev->mt76.eeprom.data;
-	int n = ARRAY_SIZE(cal_free_bytes);
-	int i;
+	u8 *eeprom;
+	int i, n;
 
 	if (!np || !of_property_read_bool(np, "mediatek,eeprom-merge-otp"))
 		return;
@@ -112,8 +111,12 @@ mt7603_apply_cal_free_data(struct mt7603_dev *dev, u8 *efuse)
 	if (!mt7603_has_cal_free_data(dev, efuse))
 		return;
 
+	n = ARRAY_SIZE(cal_free_bytes);
+
 	if (is_mt7628(dev))
 		n -= 4;
+
+	eeprom = dev->mt76.eeprom.data;
 
 	for (i = 0; i < n; i++) {
 		int offset = cal_free_bytes[i];

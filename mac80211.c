@@ -1251,7 +1251,7 @@ int mt76_get_rate(struct mt76_dev *dev,
 		  int idx, bool cck)
 {
 	bool is_2g = sband->band == NL80211_BAND_2GHZ;
-	int i, offset = 0, len = sband->n_bitrates;
+	int i, offset = 0, len;
 
 	if (cck) {
 		if (!is_2g)
@@ -1262,6 +1262,7 @@ int mt76_get_rate(struct mt76_dev *dev,
 		offset = 4;
 	}
 
+	len = sband->n_bitrates;
 	for (i = offset; i < len; i++) {
 		if ((sband->bitrates[i].hw_value & GENMASK(7, 0)) == idx)
 			return i;

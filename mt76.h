@@ -609,7 +609,7 @@ struct mt76_dev {
 
 	int txpower_cur;
 
-	// char alpha2[3];
+	char alpha2[3];
 	enum nl80211_dfs_regions region;
 
 	u32 debugfs_reg;

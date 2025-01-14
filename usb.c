@@ -514,17 +514,22 @@ static int
 mt76u_process_rx_entry(struct mt76_dev *dev, struct urb *urb,
 		       int buf_size)
 {
-	u8 *data = urb->num_sgs ? sg_virt(&urb->sg[0]) : urb->transfer_buffer;
-	int data_len = urb->num_sgs ? urb->sg[0].length : urb->actual_length;
-	int len, nsgs = 1, head_room, drv_flags = dev->drv->drv_flags;
+	u8 *data;
+	int data_len;
+	int len, nsgs = 1, head_room, drv_flags;
 	struct sk_buff *skb;
 
 	if (!test_bit(MT76_STATE_INITIALIZED, &dev->state))
 		return 0;
 
+	data = urb->num_sgs ? sg_virt(&urb->sg[0]) : urb->transfer_buffer;
+
 	len = mt76u_get_rx_entry_len(dev, data, urb->actual_length);
 	if (len < 0)
 		return 0;
+
+	data_len = urb->num_sgs ? urb->sg[0].length : urb->actual_length;
+	drv_flags = dev->drv->drv_flags;
 
 	head_room = drv_flags & MT_DRV_RX_DMA_HDR ? 0 : MT_DMA_HDR_LEN;
 	data_len = min_t(int, len, data_len - head_room);
@@ -557,6 +562,7 @@ static void mt76u_complete_rx(struct urb *urb)
 	struct mt76_dev *dev = dev_get_drvdata(&urb->dev->dev);
 	struct mt76_queue *q = urb->context;
 	unsigned long flags;
+	int idx;
 
 	trace_rx_urb(dev, urb);
 
@@ -575,10 +581,11 @@ static void mt76u_complete_rx(struct urb *urb)
 	}
 
 	spin_lock_irqsave(&q->lock, flags);
-	if (WARN_ONCE(q->entry[q->head].urb != urb, "rx urb mismatch"))
+	idx = q->head;
+	if (WARN_ONCE(q->entry[idx].urb != urb, "rx urb mismatch"))
 		goto out;
 
-	q->head = (q->head + 1) % q->ndesc;
+	q->head = (idx + 1) % q->ndesc;
 	q->queued++;
 	mt76_worker_schedule(&dev->usb.rx_worker);
 out:
@@ -887,7 +894,7 @@ mt76u_tx_queue_skb(struct mt76_dev *dev, enum mt76_txq_id qid,
 	struct mt76_tx_info tx_info = {
 		.skb = skb,
 	};
-	u16 idx = q->head;
+	u16 idx;
 	int err;
 
 	if (q->queued == q->ndesc)
@@ -898,6 +905,7 @@ mt76u_tx_queue_skb(struct mt76_dev *dev, enum mt76_txq_id qid,
 	if (err < 0)
 		return err;
 
+	idx = q->head;
 	err = mt76u_tx_setup_buffers(dev, tx_info.skb, q->entry[idx].urb);
 	if (err < 0)
 		return err;
@@ -906,7 +914,7 @@ mt76u_tx_queue_skb(struct mt76_dev *dev, enum mt76_txq_id qid,
 			    q->entry[idx].urb, mt76u_complete_tx,
 			    &q->entry[idx]);
 
-	q->head = (q->head + 1) % q->ndesc;
+	q->head = (idx + 1) % q->ndesc;
 	q->entry[idx].skb = tx_info.skb;
 	q->queued++;
 

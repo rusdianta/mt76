@@ -436,11 +436,12 @@ mt7603_regd_notifier(struct wiphy *wiphy,
 static int
 mt7603_txpower_signed(int val)
 {
-	bool sign = val & BIT(6);
+	bool sign;
 
 	if (!(val & BIT(7)))
 		return 0;
 
+	sign = val & BIT(6);
 	val &= GENMASK(5, 0);
 	if (!sign)
 		val = -val;
@@ -495,8 +496,8 @@ mt7603_init_txpower(struct mt7603_dev *dev,
 int mt7603_register_device(struct mt7603_dev *dev)
 {
 	struct mt76_bus_ops *bus_ops;
-	struct ieee80211_hw *hw = mt76_hw(dev);
-	struct wiphy *wiphy = hw->wiphy;
+	struct ieee80211_hw *hw;
+	struct wiphy *wiphy;
 	int ret;
 
 	dev->bus_ops = dev->mt76.bus;
@@ -529,6 +530,8 @@ int mt7603_register_device(struct mt7603_dev *dev)
 	if (ret)
 		return ret;
 
+	hw = mt76_hw(dev);
+	wiphy = hw->wiphy;
 	hw->queues = 4;
 	hw->max_rates = 3;
 	hw->max_report_rates = 7;

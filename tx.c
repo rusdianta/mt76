@@ -65,7 +65,7 @@ static void
 __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
 			  struct sk_buff_head *list)
 {
-	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+	struct ieee80211_tx_info *info;
 	struct mt76_tx_cb *cb = mt76_tx_skb_cb(skb);
 	u8 done = MT_TX_CB_DMA_DONE | MT_TX_CB_TXS_DONE;
 
@@ -77,6 +77,7 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
 
 	/* Tx status can be unreliable. if it fails, mark the frame as ACKed */
 	if (flags & MT_TX_CB_TXS_FAILED) {
+		info = IEEE80211_SKB_CB(skb);
 		ieee80211_tx_info_clear_status(info);
 		info->status.rates[0].idx = -1;
 		info->flags |= IEEE80211_TX_STAT_ACK;
@@ -97,7 +98,7 @@ int
 mt76_tx_status_skb_add(struct mt76_dev *dev, struct mt76_wcid *wcid,
 		       struct sk_buff *skb)
 {
-	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+	struct ieee80211_tx_info *info;
 	struct mt76_tx_cb *cb = mt76_tx_skb_cb(skb);
 	int pid;
 
@@ -106,6 +107,7 @@ mt76_tx_status_skb_add(struct mt76_dev *dev, struct mt76_wcid *wcid,
 	if (!wcid || !rcu_access_pointer(dev->wcid[wcid->idx]))
 		return MT_PACKET_ID_NO_ACK;
 
+	info = IEEE80211_SKB_CB(skb);
 	if (info->flags & IEEE80211_TX_CTL_NO_ACK)
 		return MT_PACKET_ID_NO_ACK;
 

@@ -335,9 +335,9 @@ static int
 mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_sw_queue *sq,
 		    struct mt76_txq *mtxq, struct mt76_wcid *wcid)
 {
-	struct ieee80211_txq *txq = mtxq_to_txq(mtxq);
-	enum mt76_txq_id qid = mt76_txq_get_qid(txq);
-	struct mt76_queue *hwq = sq->q;
+	struct ieee80211_txq *txq;
+	enum mt76_txq_id qid;
+	struct mt76_queue *hwq;
 	struct ieee80211_tx_info *info;
 	struct sk_buff *skb;
 	int n_frames = 1, limit;
@@ -348,6 +348,8 @@ mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_sw_queue *sq,
 
 	if (test_bit(MT_WCID_FLAG_PS, &wcid->flags))
 		return 0;
+
+	txq = mtxq_to_txq(mtxq);
 
 	skb = mt76_txq_dequeue(dev, mtxq, false);
 	if (!skb)
@@ -363,6 +365,8 @@ mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_sw_queue *sq,
 	ampdu = IEEE80211_SKB_CB(skb)->flags & IEEE80211_TX_CTL_AMPDU;
 	limit = ampdu ? 16 : 3;
 
+	hwq = sq->q;
+	qid = mt76_txq_get_qid(txq);
 	spin_lock(&hwq->lock);
 	idx = dev->queue_ops->tx_queue_skb(dev, qid, skb, wcid, txq->sta);
 	spin_unlock(&hwq->lock);

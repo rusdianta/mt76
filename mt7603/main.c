@@ -618,7 +618,7 @@ mt7603_ampdu_action(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	case IEEE80211_AMPDU_TX_OPERATIONAL:
 		mtxq->aggr = true;
 		mtxq->send_bar = false;
-		ba_size = params->buf_size
+		ba_size = params->buf_size;
 		mt7603_mac_tx_ba_reset(dev, msta->wcid.idx, tid, ba_size);
 		break;
 	case IEEE80211_AMPDU_TX_STOP_FLUSH:

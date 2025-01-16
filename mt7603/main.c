@@ -408,7 +408,7 @@ void
 mt7603_sta_ps(struct mt76_dev *mdev, struct ieee80211_sta *sta, bool ps)
 {
 	struct mt7603_dev *dev = container_of(mdev, struct mt7603_dev, mt76);
-	struct mt7603_sta *mstav;
+	struct mt7603_sta *msta;
 	struct sk_buff_head list;
 
 	mt76_stop_tx_queues(&dev->mt76, sta, true);

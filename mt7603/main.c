@@ -136,7 +136,7 @@ void mt7603_init_edcca(struct mt7603_dev *dev)
 static int
 mt7603_set_channel(struct mt7603_dev *dev, struct cfg80211_chan_def *def)
 {
-	u8 *rssi_data = (u8 *)dev->mt76.eeprom.data;
+	u8 *rssi_data;
 	int idx, ret;
 	u8 bw = MT_BW_20;
 	bool failed = false;
@@ -163,6 +163,7 @@ mt7603_set_channel(struct mt7603_dev *dev, struct cfg80211_chan_def *def)
 		goto out;
 	}
 
+ 	rssi_data = (u8 *)dev->mt76.eeprom.data;
 	if (def->chan->band == NL80211_BAND_5GHZ) {
 		idx = 1;
 		rssi_data += MT_EE_RSSI_OFFSET_5G;
@@ -327,14 +328,17 @@ mt7603_sta_add(struct mt76_dev *mdev, struct ieee80211_vif *vif,
 	       struct ieee80211_sta *sta)
 {
 	struct mt7603_dev *dev = container_of(mdev, struct mt7603_dev, mt76);
-	struct mt7603_sta *msta = (struct mt7603_sta *)sta->drv_priv;
-	struct mt7603_vif *mvif = (struct mt7603_vif *)vif->drv_priv;
+	struct mt7603_sta *msta;
+	struct mt7603_vif *mvif;
 	int idx;
 	int ret = 0;
 
 	idx = mt76_wcid_alloc(dev->mt76.wcid_mask, MT7603_WTBL_STA - 1);
 	if (idx < 0)
 		return -ENOSPC;
+
+	msta = (struct mt7603_sta *)sta->drv_priv;
+	mvif = (struct mt7603_vif *)vif->drv_priv;
 
 	INIT_LIST_HEAD(&msta->wcid.poll_list);
 	__skb_queue_head_init(&msta->psq);
@@ -356,9 +360,10 @@ int
 mt7603_sta_event(struct mt76_dev *mdev, struct ieee80211_vif *vif,
 		 struct ieee80211_sta *sta, enum mt76_sta_event ev)
 {
-	struct mt7603_dev *dev = container_of(mdev, struct mt7603_dev, mt76);
+	struct mt7603_dev *dev;
 
 	if (ev == MT76_STA_EVENT_ASSOC) {
+		dev = container_of(mdev, struct mt7603_dev, mt76);
 		mutex_lock(&dev->mt76.mutex);
 		mt7603_wtbl_update_cap(dev, sta);
 		mutex_unlock(&dev->mt76.mutex);
@@ -403,7 +408,7 @@ void
 mt7603_sta_ps(struct mt76_dev *mdev, struct ieee80211_sta *sta, bool ps)
 {
 	struct mt7603_dev *dev = container_of(mdev, struct mt7603_dev, mt76);
-	struct mt7603_sta *msta = (struct mt7603_sta *)sta->drv_priv;
+	struct mt7603_sta *mstav;
 	struct sk_buff_head list;
 
 	mt76_stop_tx_queues(&dev->mt76, sta, true);
@@ -414,6 +419,7 @@ mt7603_sta_ps(struct mt76_dev *mdev, struct ieee80211_sta *sta, bool ps)
 	__skb_queue_head_init(&list);
 
 	spin_lock_bh(&dev->ps_lock);
+	msta = (struct mt7603_sta *)sta->drv_pri;
 	skb_queue_splice_tail_init(&msta->psq, &list);
 	spin_unlock_bh(&dev->ps_lock);
 
@@ -476,12 +482,11 @@ mt7603_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	       struct ieee80211_vif *vif, struct ieee80211_sta *sta,
 	       struct ieee80211_key_conf *key)
 {
-	struct mt7603_dev *dev = hw->priv;
-	struct mt7603_vif *mvif = (struct mt7603_vif *)vif->drv_priv;
-	struct mt7603_sta *msta = sta ? (struct mt7603_sta *)sta->drv_priv :
-				  &mvif->sta;
-	struct mt76_wcid *wcid = &msta->wcid;
-	int idx = key->keyidx;
+	struct mt7603_dev *dev;
+	struct mt7603_vif *mvif;
+	struct mt7603_sta *msta;
+	struct mt76_wcid *wcid;
+	int idx;
 
 	/* fall back to sw encryption for unsupported ciphers */
 	switch (key->cipher) {
@@ -503,6 +508,12 @@ mt7603_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	    !(key->flags & IEEE80211_KEY_FLAG_PAIRWISE))
 		return -EOPNOTSUPP;
 
+	mvif = (struct mt7603_vif *)vif->drv_priv;
+	msta = sta ? (struct mt7603_sta *)sta->drv_priv :
+				  &mvif->sta;
+	wcid = &msta->wcid;
+	idx = key->keyidx;
+
 	if (cmd != SET_KEY) {
 		if (idx == wcid->hw_key_idx)
 			wcid->hw_key_idx = -1;
@@ -512,6 +523,7 @@ mt7603_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 
 	key->hw_key_idx = wcid->idx;
 	wcid->hw_key_idx = idx;
+	dev = hw->priv;	
 	mt76_wcid_key_setup(&dev->mt76, wcid, key);
 
 	return mt7603_wtbl_set_key(dev, wcid->idx, key);
@@ -572,20 +584,25 @@ static int
 mt7603_ampdu_action(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		    struct ieee80211_ampdu_params *params)
 {
-	enum ieee80211_ampdu_mlme_action action = params->action;
-	struct mt7603_dev *dev = hw->priv;
+	enum ieee80211_ampdu_mlme_action action;
+	struct mt7603_dev *dev;
 	struct ieee80211_sta *sta = params->sta;
 	struct ieee80211_txq *txq = sta->txq[params->tid];
-	struct mt7603_sta *msta = (struct mt7603_sta *)sta->drv_priv;
-	u16 tid = params->tid;
-	u16 ssn = params->ssn;
-	u8 ba_size = params->buf_size;
+	struct mt7603_sta *msta;
+	u16 tid;
+	u16 ssn;
+	u8 ba_size;
 	struct mt76_txq *mtxq;
 	int ret = 0;
 
 	if (!txq)
 		return -EINVAL;
 
+	action = params->action;
+	dev = hw->priv;
+	msta = (struct mt7603_sta *)sta->drv_priv;
+	tid = params->tid;
+	ssn = params->ssn;
 	mtxq = (struct mt76_txq *)txq->drv_priv;
 
 	mutex_lock(&dev->mt76.mutex);
@@ -601,6 +618,7 @@ mt7603_ampdu_action(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	case IEEE80211_AMPDU_TX_OPERATIONAL:
 		mtxq->aggr = true;
 		mtxq->send_bar = false;
+		ba_size = params->buf_size
 		mt7603_mac_tx_ba_reset(dev, msta->wcid.idx, tid, ba_size);
 		break;
 	case IEEE80211_AMPDU_TX_STOP_FLUSH:
@@ -627,14 +645,16 @@ static void
 mt7603_sta_rate_tbl_update(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			   struct ieee80211_sta *sta)
 {
-	struct mt7603_dev *dev = hw->priv;
-	struct mt7603_sta *msta = (struct mt7603_sta *)sta->drv_priv;
+	struct mt7603_dev *dev;
+	struct mt7603_sta *msta;
 	struct ieee80211_sta_rates *sta_rates = rcu_dereference(sta->rates);
 	int i;
 
 	if (!sta_rates)
 		return;
 
+	dev = hw->priv;
+	msta = (struct mt7603_sta *)sta->drv_priv;
 	spin_lock_bh(&dev->mt76.lock);
 	for (i = 0; i < ARRAY_SIZE(msta->rates); i++) {
 		msta->rates[i].idx = sta_rates->rate[i].idx;

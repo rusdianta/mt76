@@ -419,7 +419,7 @@ mt7603_sta_ps(struct mt76_dev *mdev, struct ieee80211_sta *sta, bool ps)
 	__skb_queue_head_init(&list);
 
 	spin_lock_bh(&dev->ps_lock);
-	msta = (struct mt7603_sta *)sta->drv_pri;
+	msta = (struct mt7603_sta *)sta->drv_priv;
 	skb_queue_splice_tail_init(&msta->psq, &list);
 	spin_unlock_bh(&dev->ps_lock);
 

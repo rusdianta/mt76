@@ -9,7 +9,7 @@
 static int
 mt76_wmac_probe(struct platform_device *pdev)
 {
-	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	struct resource *res;
 	struct mt7603_dev *dev;
 	void __iomem *mem_base;
 	struct mt76_dev *mdev;
@@ -20,6 +20,7 @@ mt76_wmac_probe(struct platform_device *pdev)
 	if (irq < 0)
 		return irq;
 
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	mem_base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(mem_base))
 		return PTR_ERR(mem_base);

@@ -408,7 +408,7 @@ void
 mt7603_sta_ps(struct mt76_dev *mdev, struct ieee80211_sta *sta, bool ps)
 {
 	struct mt7603_dev *dev = container_of(mdev, struct mt7603_dev, mt76);
-	struct mt7603_sta *msta;
+	struct mt7603_sta *msta = (struct mt7603_sta *)sta->drv_priv;
 	struct sk_buff_head list;
 
 	mt76_stop_tx_queues(&dev->mt76, sta, true);
@@ -419,7 +419,6 @@ mt7603_sta_ps(struct mt76_dev *mdev, struct ieee80211_sta *sta, bool ps)
 	__skb_queue_head_init(&list);
 
 	spin_lock_bh(&dev->ps_lock);
-	msta = (struct mt7603_sta *)sta->drv_priv;
 	skb_queue_splice_tail_init(&msta->psq, &list);
 	spin_unlock_bh(&dev->ps_lock);
 

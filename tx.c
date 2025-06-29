@@ -430,6 +430,13 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 			break;
 		}
 
+		if (dev->queue_ops->tx_cleanup &&
+		    q->queued + 2 * MT_TXQ_FREE_THR >= q->ndesc) {
+			spin_unlock_bh(&q->lock);
+			dev->queue_ops->tx_cleanup(dev, qid, false);
+			spin_lock_bh(&q->lock);
+		}
+
 		if (q->queued + MT_TXQ_FREE_THR >= q->ndesc)
 			break;
 

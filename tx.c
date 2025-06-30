@@ -351,6 +351,13 @@ mt76_release_buffered_frames(struct ieee80211_hw *hw, struct ieee80211_sta *sta,
 }
 EXPORT_SYMBOL_GPL(mt76_release_buffered_frames);
 
+static bool
+mt76_txq_stopped(struct mt76_queue *q)
+{
+	return q->stopped ||
+	       q->queued + MT_TXQ_FREE_THR >= q->ndesc;
+}
+
 static int
 mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_queue *q,
 		    struct mt76_txq *mtxq)
@@ -387,10 +394,7 @@ mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_queue *q,
 		if (test_bit(MT76_RESET, &dev->state))
 			return -EBUSY;
 
-		if (stop)
-			break;
-
-		if (q->queued + MT_TXQ_FREE_THR >= q->ndesc)
+		if (stop || mt76_txq_stopped(q))
 			break;
 
 		skb = mt76_txq_dequeue(dev, mtxq);
@@ -437,7 +441,7 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 			spin_lock_bh(&q->lock);
 		}
 
-		if (q->queued + MT_TXQ_FREE_THR >= q->ndesc)
+		if (mt76_txq_stopped(q))
 			break;
 
 		txq = ieee80211_next_txq(dev->hw, qid);

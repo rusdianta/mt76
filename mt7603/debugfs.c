@@ -74,17 +74,18 @@ mt7603_ampdu_stat_read(struct seq_file *file, void *data)
 {
 	struct mt7603_dev *dev = file->private;
 	int bound[3], i, range;
+	int size = ARRAY_SIZE(bound);
 
 	range = mt76_rr(dev, MT_AGG_ASRCR);
-	for (i = 0; i < ARRAY_SIZE(bound); i++)
+	for (i = 0; i < size; i++)
 		bound[i] = MT_AGG_ASRCR_RANGE(range, i) + 1;
 
 	seq_printf(file, "Length: %8d | ", bound[0]);
-	for (i = 0; i < ARRAY_SIZE(bound) - 1; i++)
+	for (i = 0; i < size - 1; i++)
 		seq_printf(file, "%3d -%3d | ",
 			   bound[i], bound[i + 1]);
 	seq_puts(file, "\nCount:  ");
-	for (i = 0; i < ARRAY_SIZE(bound); i++)
+	for (i = 0; i < size; i++)
 		seq_printf(file, "%8d | ", dev->mt76.aggr_stats[i]);
 	seq_puts(file, "\n");
 

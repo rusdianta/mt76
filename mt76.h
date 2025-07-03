@@ -33,7 +33,6 @@ struct mt76_reg_pair {
 
 enum mt76_bus_type {
 	MT76_BUS_MMIO,
-	MT76_BUS_USB,
 };
 
 struct mt76_bus_ops {
@@ -51,7 +50,6 @@ struct mt76_bus_ops {
 	enum mt76_bus_type type;
 };
 
-#define mt76_is_usb(dev) ((dev)->bus->type == MT76_BUS_USB)
 #define mt76_is_mmio(dev) ((dev)->bus->type == MT76_BUS_MMIO)
 
 enum mt76_txq_id {
@@ -115,10 +113,7 @@ struct mt76_queue_entry {
 		void *buf;
 		struct sk_buff *skb;
 	};
-	union {
-		struct mt76_txwi_cache *txwi;
-		struct urb *urb;
-	};
+	struct mt76_txwi_cache *txwi;
 	u16 wcid;
 	u32 dma_addr[2];
 	u16 dma_len[2];
@@ -419,29 +414,6 @@ struct mt76_mcu {
 	wait_queue_head_t wait;
 };
 
-struct mt76_usb {
-	struct mutex usb_ctrl_mtx;
-	u8 *data;
-	u16 data_len;
-
-	struct mt76_worker status_worker;
-	struct mt76_worker rx_worker;
-	struct work_struct stat_work;
-
-	u8 out_ep[__MT_EP_OUT_MAX];
-	u8 in_ep[__MT_EP_IN_MAX];
-	bool sg_en;
-
-	struct mt76u_mcu {
-		u8 *data;
-		/* multiple reads */
-		struct mt76_reg_pair *rp;
-		int rp_len;
-		u32 base;
-		bool burst;
-	} mcu;
-};
-
 struct mt76_mmio {
 	void __iomem *regs;
 	spinlock_t irq_lock;
@@ -571,10 +543,7 @@ struct mt76_dev {
 
 	struct workqueue_struct *wq;
 
-	union {
-		struct mt76_mmio mmio;
-		struct mt76_usb usb;
-	};
+	struct mt76_mmio mmio;
 };
 
 enum mt76_phy_type {

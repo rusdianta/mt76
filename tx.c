@@ -207,7 +207,7 @@ mt76_tx_check_non_aql(struct mt76_dev *dev, u16 wcid_idx, struct sk_buff *skb)
 
 	rcu_read_lock();
 
-	wcid = rcu_dereference(dev->wcid[wcid_idx]);
+	wcid = __mt76_wcid_ptr(dev, wcid_idx);
 	if (wcid) {
 		pending = atomic_dec_return(&wcid->non_aql_packets);
 		if (pending < 0)
@@ -465,7 +465,7 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 			break;
 
 		mtxq = (struct mt76_txq *)txq->drv_priv;
-		wcid = rcu_dereference(dev->wcid[mtxq->wcid]);
+		wcid = __mt76_wcid_ptr(dev, mtxq->wcid);
 		if (!wcid || test_bit(MT_WCID_FLAG_PS, &wcid->flags))
 			continue;
 

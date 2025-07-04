@@ -788,10 +788,7 @@ mt76_airtime_flush_ampdu(struct mt76_dev *dev)
 		return;
 
 	wcid_idx = dev->rx_ampdu_status.wcid_idx;
-	if (wcid_idx < ARRAY_SIZE(dev->wcid))
-		wcid = rcu_dereference(dev->wcid[wcid_idx]);
-	else
-		wcid = NULL;
+	wcid = __mt76_wcid_ptr(dev, wcid_idx);
 	dev->rx_ampdu_status.wcid = wcid;
 
 	mt76_airtime_report(dev, &dev->rx_ampdu_status, dev->rx_ampdu_len);

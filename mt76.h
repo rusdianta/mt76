@@ -257,19 +257,24 @@ struct mt76_txwi_cache {
 
 struct mt76_rx_tid {
 	struct rcu_head rcu_head;
-
 	struct mt76_dev *dev;
 
 	spinlock_t lock;
-	struct delayed_work reorder_work;
+	
+	unsigned long timeout;
+	unsigned long oldest_time;
 
 	u16 head;
+
 	u8 size;
 	u8 nframes;
-
 	u8 num;
 
-	u8 started:1, stopped:1, timer_pending:1;
+	u8 started;
+	u8 stopped;
+	u8 timer_pending;
+
+	struct delayed_work reorder_work;
 
 	struct sk_buff *reorder_buf[];
 };
@@ -568,6 +573,18 @@ enum mt76_phy_type {
 }
 
 extern struct ieee80211_rate mt76_rates[12];
+
+#ifndef HAVE_DEV_KFREE_SKB_LIST
+
+static inline void dev_kfree_skb_list(struct sk_buff_head *list)
+{
+	struct sk_buff *skb;
+
+	while ((skb = __skb_dequeue(list)))
+		dev_kfree_skb(skb);
+}
+
+#endif
 
 #define __mt76_rr(dev, ...)	(dev)->bus->rr((dev), __VA_ARGS__)
 #define __mt76_wr(dev, ...)	(dev)->bus->wr((dev), __VA_ARGS__)

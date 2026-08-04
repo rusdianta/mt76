@@ -432,40 +432,75 @@ struct mt76_rx_status {
 	};
 
 	u32 reorder_time;
-
 	u32 ampdu_ref;
 	u32 timestamp;
+	u32 flag;
+
+	u16 freq;
+	u16 seqno;
 
 	u8 iv[6];
 
-	u8 aggr:1;
 	u8 qos_ctl;
-	u16 seqno;
-
-	u16 freq;
-	u32 flag;
 	u8 enc_flags;
-	u8 encoding:2, bw:3;
+
 	u8 rate_idx;
 	u8 nss;
 	u8 band;
-	s8 signal;
 	u8 chains;
+
+	u8 aggr:1;
+	u8 encoding:2;
+	u8 bw:3;
+
+	s8 signal;
+
 	s8 chain_signal[IEEE80211_MAX_CHAINS];
 };
 
 struct mt76_dev {
+	/* ===== Hot path ===== */
 	struct ieee80211_hw *hw;
+	struct device *dev;
 
-	spinlock_t tx_lock;
-	struct list_head tx_list;
-	
-	struct cfg80211_chan_def chandef;
-	struct ieee80211_channel *main_chan;
+	const struct mt76_bus_ops *bus;
+	const struct mt76_driver_ops *drv;
+	const struct mt76_mcu_ops *mcu_ops;
+	const struct mt76_queue_ops *queue_ops;
 
 	struct mt76_channel_state *chan_state;
+
 	spinlock_t lock;
+	spinlock_t tx_lock;
+	spinlock_t rx_lock;
 	spinlock_t cc_lock;
+	spinlock_t status_lock;
+	spinlock_t sta_poll_lock;
+
+	struct mutex mutex;
+
+	/* ===== TX/RX fast path ===== */
+	struct list_head tx_list;
+	struct list_head txwi_cache;
+	struct list_head wcid_list;
+	struct list_head sta_poll_list;
+
+	struct mt76_queue *q_tx[__MT_TXQ_MAX];
+	struct mt76_queue q_rx[__MT_RXQ_MAX];
+
+	struct napi_struct napi[__MT_RXQ_MAX];
+	struct napi_struct tx_napi;
+
+	struct sk_buff_head rx_skb[__MT_RXQ_MAX];
+
+	struct mt76_worker tx_worker;
+	struct delayed_work mac_work;
+
+	wait_queue_head_t tx_wait;
+
+	/* ===== Channel ===== */
+	struct cfg80211_chan_def chandef;
+	struct ieee80211_channel *main_chan;
 
 	u32 cur_cc_bss_rx;
 
@@ -473,82 +508,65 @@ struct mt76_dev {
 	u32 rx_ampdu_len;
 	u32 rx_ampdu_ref;
 
-	struct mutex mutex;
-
-	const struct mt76_bus_ops *bus;
-	const struct mt76_driver_ops *drv;
-	const struct mt76_mcu_ops *mcu_ops;
-	struct device *dev;
-
-	struct mt76_mcu mcu;
-
-	struct net_device napi_dev;
-	spinlock_t rx_lock;
-	struct napi_struct napi[__MT_RXQ_MAX];
-	struct sk_buff_head rx_skb[__MT_RXQ_MAX];
-
-	struct list_head txwi_cache;
-	struct mt76_queue *q_tx[__MT_TXQ_MAX];
-	struct mt76_queue q_rx[__MT_RXQ_MAX];
-	const struct mt76_queue_ops *queue_ops;
-	int tx_dma_idx[4];
-
-	struct mt76_worker tx_worker;
-	struct napi_struct tx_napi;
-	struct delayed_work mac_work;
-
-	wait_queue_head_t tx_wait;
-	/* spinclock used to protect wcid pktid linked list */
-	spinlock_t status_lock;
-
+	/* ===== WCID ===== */
 	unsigned long wcid_mask[MT76_N_WCIDS / BITS_PER_LONG];
 
 	struct mt76_wcid global_wcid;
 	struct mt76_wcid __rcu *wcid[MT76_N_WCIDS];
-	struct list_head wcid_list;
 
-	u8 macaddr[ETH_ALEN];
-	struct list_head sta_poll_list;
-	spinlock_t sta_poll_lock;
+	/* ===== Hardware ===== */
+	struct mt76_mcu mcu;
+	struct net_device napi_dev;
 
+	struct mt76_rate_power rate_power;
+
+	struct mt76_sband sband_2g;
+	struct mt76_sband sband_5g;
+
+	struct debugfs_blob_wrapper eeprom;
+	struct debugfs_blob_wrapper otp;
+
+	struct mt76_hw_cap cap;
+
+	struct mt76_mmio mmio;
+
+	/* ===== Statistics ===== */
 	u32 rev;
 	unsigned long state;
 
 	u32 aggr_stats[32];
 
-	u8 antenna_mask;
+	int tx_dma_idx[4];
 
-	struct tasklet_struct pre_tbtt_tasklet;
 	int beacon_int;
-	u8 beacon_mask;
-
-	struct mt76_sband sband_2g;
-	struct mt76_sband sband_5g;
-	struct debugfs_blob_wrapper eeprom;
-	struct debugfs_blob_wrapper otp;
-	struct mt76_hw_cap cap;
-
-	struct mt76_rate_power rate_power;
 	int txpower_cur;
+
+	u32 debugfs_reg;
+	u32 rxfilter;
 
 	enum nl80211_dfs_regions region;
 
-	u32 debugfs_reg;
-
-	struct led_classdev led_cdev;
-	char led_name[32];
-	bool led_al;
-	u8 led_pin;
-
-	u8 csa_complete;
-
 	ktime_t survey_time;
 
-	u32 rxfilter;
+	/* ===== Small packed fields ===== */
+	u8 antenna_mask;
+
+	u8 beacon_mask;
+	u8 led_pin;
+	u8 csa_complete;
+
+	bool led_al;
+
+	u8 macaddr[ETH_ALEN];
+
+	/* ===== LED ===== */
+	struct led_classdev led_cdev;
+	char led_name[32];
+
+	/* ===== Misc ===== */
+	struct tasklet_struct pre_tbtt_tasklet;
 
 	struct workqueue_struct *wq;
-
-	struct mt76_mmio mmio;
 };
 
 enum mt76_phy_type {

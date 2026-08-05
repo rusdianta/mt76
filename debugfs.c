@@ -76,17 +76,18 @@ EXPORT_SYMBOL_GPL(mt76_seq_puts_array);
 static int mt76_read_rate_txpower(struct seq_file *s, void *data)
 {
 	struct mt76_dev *dev = dev_get_drvdata(s->private);
+	struct mt76_rate_power *rate_power = &dev->rate_power;
 
-	mt76_seq_puts_array(s, "CCK", dev->rate_power.cck,
-			    ARRAY_SIZE(dev->rate_power.cck));
-	mt76_seq_puts_array(s, "OFDM", dev->rate_power.ofdm,
-			    ARRAY_SIZE(dev->rate_power.ofdm));
-	mt76_seq_puts_array(s, "STBC", dev->rate_power.stbc,
-			    ARRAY_SIZE(dev->rate_power.stbc));
-	mt76_seq_puts_array(s, "HT", dev->rate_power.ht,
-			    ARRAY_SIZE(dev->rate_power.ht));
-	mt76_seq_puts_array(s, "VHT", dev->rate_power.vht,
-			    ARRAY_SIZE(dev->rate_power.vht));
+	mt76_seq_puts_array(s, "CCK", rate_power->cck,
+			    ARRAY_SIZE(rate_power->cck));
+	mt76_seq_puts_array(s, "OFDM", rate_power->ofdm,
+			    ARRAY_SIZE(rate_power->ofdm));
+	mt76_seq_puts_array(s, "STBC", rate_power->stbc,
+			    ARRAY_SIZE(rate_power->stbc));
+	mt76_seq_puts_array(s, "HT", rate_power->ht,
+			    ARRAY_SIZE(rate_power->ht));
+	mt76_seq_puts_array(s, "VHT", rate_power->vht,
+			    ARRAY_SIZE(rate_power->vht));
 	return 0;
 }
 

@@ -18,7 +18,7 @@ mt76_get_of_eeprom(struct mt76_dev *dev, int len)
 	const __be32 *list;
 	const char *part;
 	phandle phandle;
-	int offset = 0;
+	int offset;
 	int size;
 	size_t retlen;
 	int ret;
@@ -29,6 +29,9 @@ mt76_get_of_eeprom(struct mt76_dev *dev, int len)
 	list = of_get_property(np, "mediatek,mtd-eeprom", &size);
 	if (!list)
 		return -ENOENT;
+
+	if (size < 2 * sizeof(*list))
+		return -EINVAL;
 
 	phandle = be32_to_cpup(list++);
 	if (!phandle)
@@ -44,40 +47,45 @@ mt76_get_of_eeprom(struct mt76_dev *dev, int len)
 
 	mtd = get_mtd_device_nm(part);
 	if (IS_ERR(mtd)) {
-		ret =  PTR_ERR(mtd);
+		ret = PTR_ERR(mtd);
 		goto out_put_node;
 	}
 
-	if (size <= sizeof(*list)) {
+	offset = be32_to_cpup(list);
+
+	if (offset > mtd->size || len > mtd->size - offset) {
 		ret = -EINVAL;
-		goto out_put_node;
+		goto out_put_mtd;
 	}
 
-	offset += be32_to_cpup(list);
 	ret = mtd_read(mtd, offset, len, &retlen, dev->eeprom.data);
-	put_mtd_device(mtd);
+
 	if (mtd_is_bitflip(ret))
 		ret = 0;
+
 	if (ret) {
 		dev_err(dev->dev, "reading EEPROM from mtd %s failed: %i\n",
 			part, ret);
-		goto out_put_node;
+		goto out_put_mtd;
 	}
 
 	if (retlen < len) {
 		ret = -EINVAL;
-		goto out_put_node;
+		goto out_put_mtd;
 	}
 
 	if (of_property_read_bool(dev->dev->of_node, "big-endian")) {
 		u8 *data = (u8 *)dev->eeprom.data;
 		int i;
 
-		/* convert eeprom data in Little Endian */
+		/* Convert EEPROM data to Little Endian */
 		for (i = 0; i < round_down(len, 2); i += 2)
 			put_unaligned_le16(get_unaligned_be16(&data[i]),
 					   &data[i]);
 	}
+
+out_put_mtd:
+	put_mtd_device(mtd);
 
 out_put_node:
 	of_node_put(np);

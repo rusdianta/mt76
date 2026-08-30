@@ -50,14 +50,10 @@ void mt7603_mac_set_timing(struct mt7603_dev *dev)
 	int offset = 3 * dev->coverage_class;
 	u32 reg_offset = FIELD_PREP(MT_TIMEOUT_VAL_PLCP, offset) |
 			 FIELD_PREP(MT_TIMEOUT_VAL_CCA, offset);
-	bool is_5ghz = dev->mt76.chandef.chan->band == NL80211_BAND_5GHZ;
 	int sifs;
 	u32 val;
 
-	if (is_5ghz)
-		sifs = 16;
-	else
-		sifs = 10;
+	sifs = 10;
 
 	mt76_set(dev, MT_ARB_SCR,
 		 MT_ARB_SCR_TX_DISABLE | MT_ARB_SCR_RX_DISABLE);
@@ -71,7 +67,7 @@ void mt7603_mac_set_timing(struct mt7603_dev *dev)
 		FIELD_PREP(MT_IFS_SIFS, sifs) |
 		FIELD_PREP(MT_IFS_SLOT, dev->slottime));
 
-	if (dev->slottime < 20 || is_5ghz)
+	if (dev->slottime < 20)
 		val = MT7603_CFEND_RATE_DEFAULT;
 	else
 		val = MT7603_CFEND_RATE_11B;
@@ -1188,10 +1184,7 @@ out:
 		cck = true;
 		/* fall through */
 	case MT_PHY_TYPE_OFDM:
-		if (dev->mt76.chandef.chan->band == NL80211_BAND_5GHZ)
-			sband = &dev->mt76.sband_5g.sband;
-		else
-			sband = &dev->mt76.sband_2g.sband;
+		sband = &dev->mt76.sband_2g.sband;
 		final_rate &= GENMASK(5, 0);
 		final_rate = mt76_get_rate(&dev->mt76, sband, final_rate,
 					   cck);

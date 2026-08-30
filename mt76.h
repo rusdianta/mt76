@@ -322,7 +322,6 @@ enum mt76_sta_event {
 
 struct mt76_hw_cap {
 	bool has_2ghz;
-	bool has_5ghz;
 };
 
 #define MT_DRV_TXWI_NO_FREE			BIT(0)
@@ -689,7 +688,7 @@ __mt76_wcid_ptr(struct mt76_dev *dev, u16 idx)
 struct mt76_dev *mt76_alloc_device(struct device *pdev, unsigned int size,
 				   const struct ieee80211_ops *ops,
 				   const struct mt76_driver_ops *drv_ops);
-int mt76_register_device(struct mt76_dev *dev, bool vht,
+int mt76_register_device(struct mt76_dev *dev,
 			 struct ieee80211_rate *rates, int n_rates);
 void mt76_unregister_device(struct mt76_dev *dev);
 void mt76_free_device(struct mt76_dev *dev);
@@ -817,7 +816,7 @@ void mt76_set_channel(struct mt76_dev *dev);
 void mt76_update_survey(struct mt76_dev *dev);
 int mt76_get_survey(struct ieee80211_hw *hw, int idx,
 		    struct survey_info *survey);
-void mt76_set_stream_caps(struct mt76_dev *dev, bool vht);
+void mt76_set_stream_caps(struct mt76_dev *dev);
 
 int mt76_rx_aggr_start(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tid,
 		       u16 ssn, u8 size);

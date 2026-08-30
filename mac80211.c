@@ -2,19 +2,13 @@
 /*
  * Copyright (C) 2016 Felix Fietkau <nbd@nbd.name>
  */
+
 #include <uapi/linux/sched/types.h>
 #include <linux/of.h>
 #include "mt76.h"
 
 #define CHAN2G(_idx, _freq) {			\
 	.band = NL80211_BAND_2GHZ,		\
-	.center_freq = (_freq),			\
-	.hw_value = (_idx),			\
-	.max_power = 30,			\
-}
-
-#define CHAN5G(_idx, _freq) {			\
-	.band = NL80211_BAND_5GHZ,		\
 	.center_freq = (_freq),			\
 	.hw_value = (_idx),			\
 	.max_power = 30,			\
@@ -35,40 +29,6 @@ static const struct ieee80211_channel mt76_channels_2ghz[] = {
 	CHAN2G(12, 2467),
 	CHAN2G(13, 2472),
 	CHAN2G(14, 2484),
-};
-
-static const struct ieee80211_channel mt76_channels_5ghz[] = {
-	CHAN5G(36, 5180),
-	CHAN5G(40, 5200),
-	CHAN5G(44, 5220),
-	CHAN5G(48, 5240),
-
-	CHAN5G(52, 5260),
-	CHAN5G(56, 5280),
-	CHAN5G(60, 5300),
-	CHAN5G(64, 5320),
-
-	CHAN5G(100, 5500),
-	CHAN5G(104, 5520),
-	CHAN5G(108, 5540),
-	CHAN5G(112, 5560),
-	CHAN5G(116, 5580),
-	CHAN5G(120, 5600),
-	CHAN5G(124, 5620),
-	CHAN5G(128, 5640),
-	CHAN5G(132, 5660),
-	CHAN5G(136, 5680),
-	CHAN5G(140, 5700),
-	CHAN5G(144, 5720),
-
-	CHAN5G(149, 5745),
-	CHAN5G(153, 5765),
-	CHAN5G(157, 5785),
-	CHAN5G(161, 5805),
-	CHAN5G(165, 5825),
-	CHAN5G(169, 5845),
-	CHAN5G(173, 5865),
-	CHAN5G(177, 5885),
 };
 
 static const struct ieee80211_tpt_blink mt76_tpt_blink[] = {
@@ -139,13 +99,10 @@ static void mt76_led_cleanup(struct mt76_dev *dev)
 }
 
 static void mt76_init_stream_cap(struct mt76_dev *dev,
-				 struct ieee80211_supported_band *sband,
-				 bool vht)
+				 struct ieee80211_supported_band *sband)
 {
 	struct ieee80211_sta_ht_cap *ht_cap = &sband->ht_cap;
 	int i, nstream = hweight8(dev->antenna_mask);
-	struct ieee80211_sta_vht_cap *vht_cap;
-	u16 mcs_map = 0;
 
 	if (nstream > 1)
 		ht_cap->cap |= IEEE80211_HT_CAP_TX_STBC;
@@ -155,43 +112,22 @@ static void mt76_init_stream_cap(struct mt76_dev *dev,
 	for (i = 0; i < IEEE80211_HT_MCS_MASK_LEN; i++)
 		ht_cap->mcs.rx_mask[i] = i < nstream ? 0xff : 0;
 
-	if (!vht)
-		return;
-
-	vht_cap = &sband->vht_cap;
-	if (nstream > 1)
-		vht_cap->cap |= IEEE80211_VHT_CAP_TXSTBC;
-	else
-		vht_cap->cap &= ~IEEE80211_VHT_CAP_TXSTBC;
-
-	for (i = 0; i < 8; i++) {
-		if (i < nstream)
-			mcs_map |= (IEEE80211_VHT_MCS_SUPPORT_0_9 << (i * 2));
-		else
-			mcs_map |=
-				(IEEE80211_VHT_MCS_NOT_SUPPORTED << (i * 2));
-	}
-	vht_cap->vht_mcs.rx_mcs_map = cpu_to_le16(mcs_map);
-	vht_cap->vht_mcs.tx_mcs_map = cpu_to_le16(mcs_map);
+	return;
 }
 
-void mt76_set_stream_caps(struct mt76_dev *dev, bool vht)
+void mt76_set_stream_caps(struct mt76_dev *dev)
 {
-	if (dev->cap.has_2ghz)
-		mt76_init_stream_cap(dev, &dev->sband_2g.sband, false);
-	if (dev->cap.has_5ghz)
-		mt76_init_stream_cap(dev, &dev->sband_5g.sband, vht);
+	mt76_init_stream_cap(dev, &dev->sband_2g.sband);
 }
 EXPORT_SYMBOL_GPL(mt76_set_stream_caps);
 
 static int
 mt76_init_sband(struct mt76_dev *dev, struct mt76_sband *msband,
 		const struct ieee80211_channel *chan, int n_chan,
-		struct ieee80211_rate *rates, int n_rates, bool vht)
+		struct ieee80211_rate *rates, int n_rates)
 {
 	struct ieee80211_supported_band *sband = &msband->sband;
 	struct ieee80211_sta_ht_cap *ht_cap;
-	struct ieee80211_sta_vht_cap *vht_cap;
 	void *chanlist;
 	int size;
 
@@ -223,19 +159,7 @@ mt76_init_sband(struct mt76_dev *dev, struct mt76_sband *msband,
 	ht_cap->mcs.tx_params = IEEE80211_HT_MCS_TX_DEFINED;
 	ht_cap->ampdu_factor = IEEE80211_HT_MAX_AMPDU_64K;
 
-	mt76_init_stream_cap(dev, sband, vht);
-
-	if (!vht)
-		return 0;
-
-	vht_cap = &sband->vht_cap;
-	vht_cap->vht_supported = true;
-	vht_cap->cap |= IEEE80211_VHT_CAP_RXLDPC |
-			IEEE80211_VHT_CAP_RXSTBC_1 |
-			IEEE80211_VHT_CAP_SHORT_GI_80 |
-			IEEE80211_VHT_CAP_RX_ANTENNA_PATTERN |
-			IEEE80211_VHT_CAP_TX_ANTENNA_PATTERN |
-			(3 << IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_SHIFT);
+	mt76_init_stream_cap(dev, sband);
 
 	return 0;
 }
@@ -249,19 +173,7 @@ mt76_init_sband_2g(struct mt76_dev *dev, struct ieee80211_rate *rates,
 	return mt76_init_sband(dev, &dev->sband_2g,
 			       mt76_channels_2ghz,
 			       ARRAY_SIZE(mt76_channels_2ghz),
-			       rates, n_rates, false);
-}
-
-static int
-mt76_init_sband_5g(struct mt76_dev *dev, struct ieee80211_rate *rates,
-		   int n_rates, bool vht)
-{
-	dev->hw->wiphy->bands[NL80211_BAND_5GHZ] = &dev->sband_5g.sband;
-
-	return mt76_init_sband(dev, &dev->sband_5g,
-			       mt76_channels_5ghz,
-			       ARRAY_SIZE(mt76_channels_5ghz),
-			       rates, n_rates, vht);
+			       rates, n_rates);
 }
 
 static void
@@ -338,7 +250,7 @@ mt76_alloc_device(struct device *pdev, unsigned int size,
 }
 EXPORT_SYMBOL_GPL(mt76_alloc_device);
 
-int mt76_register_device(struct mt76_dev *dev, bool vht,
+int mt76_register_device(struct mt76_dev *dev,
 			 struct ieee80211_rate *rates, int n_rates)
 {
 	struct sched_param sparam = {.sched_priority = 1};
@@ -410,15 +322,8 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 			return ret;
 	}
 
-	if (dev->cap.has_5ghz) {
-		ret = mt76_init_sband_5g(dev, rates + 4, n_rates - 4, vht);
-		if (ret)
-			return ret;
-	}
-
 	wiphy_read_of_freq_limits(dev->hw->wiphy);
 	mt76_check_sband(dev, NL80211_BAND_2GHZ);
-	mt76_check_sband(dev, NL80211_BAND_5GHZ);
 
 	if (IS_ENABLED(CONFIG_MT76_LEDS)) {
 		ret = mt76_led_init(dev);
@@ -427,8 +332,11 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
 	}
 
 	ret = ieee80211_register_hw(hw);
-	if (ret)
+	if (ret) {
+		if (IS_ENABLED(CONFIG_MT76_LEDS))
+			mt76_led_cleanup(dev);
 		return ret;
+	}
 
 	WARN_ON(mt76_worker_setup(hw, &dev->tx_worker, NULL, "tx"));
 	sched_setscheduler(dev->tx_worker.task, SCHED_FIFO, &sparam);
@@ -489,16 +397,11 @@ EXPORT_SYMBOL_GPL(mt76_has_tx_pending);
 static struct mt76_channel_state *
 mt76_channel_state(struct mt76_dev *dev, struct ieee80211_channel *c)
 {
-	struct mt76_sband *msband;
 	int idx;
 
-	if (c->band == NL80211_BAND_2GHZ)
-		msband = &dev->sband_2g;
-	else
-		msband = &dev->sband_5g;
+	idx = c - &dev->sband_2g.sband.channels[0];
 
-	idx = c - &msband->sband.channels[0];
-	return &msband->chan[idx];
+	return &dev->sband_2g.chan[idx];
 }
 
 void mt76_update_survey(struct mt76_dev *dev)
@@ -561,10 +464,6 @@ int mt76_get_survey(struct ieee80211_hw *hw, int idx,
 		mt76_update_survey(dev);
 
 	sband = &dev->sband_2g;
-	if (idx >= sband->sband.n_channels) {
-		idx -= sband->sband.n_channels;
-		sband = &dev->sband_5g;
-	}
 
 	if (idx >= sband->sband.n_channels) {
 		ret = -ENOENT;
@@ -962,9 +861,10 @@ mt76_sta_add(struct mt76_dev *dev, struct ieee80211_vif *vif,
 	}
 
 	ewma_signal_init(&wcid->rssi);
-	rcu_assign_pointer(dev->wcid[wcid->idx], wcid);
-
 	mt76_wcid_init(wcid);
+
+	rcu_assign_pointer(dev->wcid[wcid->idx], wcid);
+	
 out:
 	mutex_unlock(&dev->mutex);
 

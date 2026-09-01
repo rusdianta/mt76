@@ -517,7 +517,14 @@ mt7603_mac_fill_rx(struct mt7603_dev *dev, struct sk_buff *skb)
 	i >>= 1;
 
 	idx = FIELD_GET(MT_RXD2_NORMAL_WLAN_IDX, rxd2);
-	status->wcid = mt7603_rx_get_wcid(dev, idx, unicast);
+	rcu_read_lock();
+	{
+		struct mt76_wcid *wcid;
+
+		wcid = mt7603_rx_get_wcid(dev, idx, unicast);
+		status->wcid_idx = wcid ? wcid->idx : MT76_INVALID_WCID_IDX;
+	}
+	rcu_read_unlock();
 
 	status->band = sband->band;
 	if (i < sband->n_channels)
@@ -665,7 +672,7 @@ mt7603_mac_fill_rx(struct mt7603_dev *dev, struct sk_buff *skb)
 	}
 
 	hdr = (struct ieee80211_hdr *)skb->data;
-	if (!status->wcid || !ieee80211_is_data_qos(hdr->frame_control))
+	if (status->wcid_idx == MT76_INVALID_WCID_IDX || !ieee80211_is_data_qos(hdr->frame_control))
 		return 0;
 
 	status->aggr = unicast &&

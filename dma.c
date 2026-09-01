@@ -378,8 +378,10 @@ mt76_dma_tx_queue_skb(struct mt76_dev *dev, struct mt76_queue *q,
 	dma_addr_t addr;
 	u8 *txwi;
 
-	if (READ_ONCE(q->queued) + 1 >= q->ndesc - 1)
+	if (READ_ONCE(q->queued) + 1 >= q->ndesc - 1) {
+		dev_kfree_skb(skb);
 		return -ENOMEM;
+	}
 
 	t = mt76_get_txwi(dev);
 	if (!t) {

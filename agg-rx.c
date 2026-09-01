@@ -144,11 +144,11 @@ mt76_rx_aggr_reorder_work(struct work_struct *work)
 }
 
 static void
-mt76_rx_aggr_check_ctl(struct sk_buff *skb, struct sk_buff_head *frames)
+mt76_rx_aggr_check_ctl(struct mt76_dev *dev, struct sk_buff *skb, struct sk_buff_head *frames)
 {
 	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
 	struct ieee80211_bar *bar = (struct ieee80211_bar *)skb->data;
-	struct mt76_wcid *wcid = status->wcid;
+	struct mt76_wcid *wcid;
 	struct mt76_rx_tid *tid;
 	u8 tidno;
 	u16 seqno;
@@ -169,10 +169,11 @@ mt76_rx_aggr_check_ctl(struct sk_buff *skb, struct sk_buff_head *frames)
 
 	seqno = IEEE80211_SEQ_TO_SN(le16_to_cpu(bar->start_seq_num));
 
-	if (!wcid)
-		return;
-
 	rcu_read_lock();
+
+	wcid = __mt76_wcid_ptr(dev, status->wcid_idx);
+	if (!wcid)
+		goto rcu_unlock;
 
 	tid = rcu_dereference(wcid->aggr[tidno]);
 	if (!tid)
@@ -189,10 +190,10 @@ rcu_unlock:
 	rcu_read_unlock();
 }
 
-void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
+void mt76_rx_aggr_reorder(struct mt76_dev *dev, struct sk_buff *skb, struct sk_buff_head *frames)
 {
 	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
-	struct mt76_wcid *wcid = status->wcid;
+	struct mt76_wcid *wcid;
 	struct sk_buff **reorder_buf;
 	struct mt76_rx_tid *tid;
 	struct sk_buff *drop_skb = NULL;
@@ -203,33 +204,34 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 
 	__skb_queue_tail(frames, skb);
 
+	rcu_read_lock();
+
+	wcid = __mt76_wcid_ptr(dev, status->wcid_idx);
 	if (!wcid)
-		return;
+		goto out_no_wcid;
 
 	qos_ctl = status->qos_ctl;
 	tidno = qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
 
 	if (tidno >= IEEE80211_NUM_TIDS)
-		return;
+		goto out_no_wcid;
 
 	if (!status->aggr) {
 		if (!(status->flag & RX_FLAG_8023))
-			mt76_rx_aggr_check_ctl(skb, frames);
+			mt76_rx_aggr_check_ctl(dev, skb, frames);
+
+		rcu_read_unlock();
 		return;
 	}
 
 	/* not part of a BA session */
 	ackp = qos_ctl & IEEE80211_QOS_CTL_ACK_POLICY_MASK;
 	if (ackp == IEEE80211_QOS_CTL_ACK_POLICY_NOACK)
-		return;
-
-	rcu_read_lock();
+		goto out_no_wcid;
 
 	tid = rcu_dereference(wcid->aggr[tidno]);
-	if (!tid) {
-		rcu_read_unlock();
-		return;
-	}
+	if (!tid)
+		goto out_no_wcid;
 
 	reorder_buf = tid->reorder_buf;
 
@@ -300,6 +302,8 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 
 out:
 	spin_unlock_bh(&tid->lock);
+
+out_no_wcid:
 	rcu_read_unlock();
 
 	if (drop_skb)

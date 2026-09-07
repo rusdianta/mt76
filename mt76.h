@@ -87,6 +87,8 @@ struct mt76_queue_entry {
 	};
 	struct mt76_txwi_cache *txwi;
 	enum mt76_txq_id qid;
+	u32 dma_addr[2];
+	u16 dma_len[2];
 	bool skip_buf0:1;
 	bool schedule:1;
 	bool done:1;

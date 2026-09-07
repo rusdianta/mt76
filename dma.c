@@ -49,6 +49,7 @@ mt76_dma_add_buf(struct mt76_dev *dev, struct mt76_queue *q,
 		 struct mt76_queue_buf *buf, int nbufs, u32 info,
 		 struct sk_buff *skb, void *txwi)
 {
+	struct mt76_queue_entry *entry;
 	struct mt76_desc *desc;
 	u32 ctrl;
 	int i, idx = -1;
@@ -76,6 +77,15 @@ mt76_dma_add_buf(struct mt76_dev *dev, struct mt76_queue *q,
 		q->head = (q->head + 1) % q->ndesc;
 
 		desc = &q->desc[idx];
+		entry = &q->entry[idx];
+
+		entry->dma_addr[0] = buf[0].addr;
+		entry->dma_len[0] = buf[0].len;
+
+		if (i < nbufs - 1) {
+			entry->dma_addr[1] = buf[1].addr;
+			entry->dma_len[1] = buf[1].len;
+		}
 
 		WRITE_ONCE(desc->buf0, cpu_to_le32(buf0));
 		WRITE_ONCE(desc->buf1, cpu_to_le32(buf1));
@@ -100,19 +110,13 @@ mt76_dma_tx_cleanup_idx(struct mt76_dev *dev, struct mt76_queue *q, int idx,
 	u32 ctrl = le32_to_cpu(__ctrl);
 
 	if (!e->skip_buf0) {
-		__le32 addr = READ_ONCE(q->desc[idx].buf0);
-		u32 len = FIELD_GET(MT_DMA_CTL_SD_LEN0, ctrl);
-
-		dma_unmap_single(dev->dev, le32_to_cpu(addr), len,
-				 DMA_TO_DEVICE);
+		dma_unmap_single(dev->dev, e->dma_addr[0], e->dma_len[0],
+				DMA_TO_DEVICE);
 	}
 
 	if (!(ctrl & MT_DMA_CTL_LAST_SEC0)) {
-		__le32 addr = READ_ONCE(q->desc[idx].buf1);
-		u32 len = FIELD_GET(MT_DMA_CTL_SD_LEN1, ctrl);
-
-		dma_unmap_single(dev->dev, le32_to_cpu(addr), len,
-				 DMA_TO_DEVICE);
+		dma_unmap_single(dev->dev, e->dma_addr[1], e->dma_len[1],
+				DMA_TO_DEVICE);
 	}
 
 	if (e->txwi == DMA_DUMMY_DATA)
@@ -199,7 +203,7 @@ mt76_dma_get_buf(struct mt76_dev *dev, struct mt76_queue *q, int idx,
 	void *buf = e->buf;
 	int buf_len = SKB_WITH_OVERHEAD(q->buf_size);
 
-	buf_addr = le32_to_cpu(READ_ONCE(desc->buf0));
+	buf_addr = e->dma_addr[0];
 	if (len) {
 		u32 ctl = le32_to_cpu(READ_ONCE(desc->ctrl));
 		*len = FIELD_GET(MT_DMA_CTL_SD_LEN0, ctl);

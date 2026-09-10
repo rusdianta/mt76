@@ -203,7 +203,7 @@ mt76_tx(struct mt76_dev *dev, struct ieee80211_sta *sta,
 	q = dev->q_tx[qid].q;
 
 	spin_lock_bh(&q->lock);
-	dev->queue_ops->tx_queue_skb(dev, qid, skb, wcid, sta);
+	dev->queue_ops->tx_queue_skb(dev, q, skb, wcid, sta);
 	dev->queue_ops->kick(dev, q);
 
 	if (q->queued > q->ndesc - 8 && !q->stopped) {
@@ -244,6 +244,7 @@ mt76_queue_ps_skb(struct mt76_dev *dev, struct ieee80211_sta *sta,
 {
 	struct mt76_wcid *wcid = (struct mt76_wcid *)sta->drv_priv;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+	struct mt76_queue *q = dev->q_tx[MT_TXQ_PSD].q;
 
 	info->control.flags |= IEEE80211_TX_CTRL_PS_RESPONSE;
 	if (last)
@@ -251,7 +252,7 @@ mt76_queue_ps_skb(struct mt76_dev *dev, struct ieee80211_sta *sta,
 			       IEEE80211_TX_CTL_REQ_TX_STATUS;
 
 	mt76_skb_set_moredata(skb, !last);
-	dev->queue_ops->tx_queue_skb(dev, MT_TXQ_PSD, skb, wcid, sta);
+	dev->queue_ops->tx_queue_skb(dev, q, skb, wcid, sta);
 }
 
 void
@@ -303,7 +304,6 @@ mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_sw_queue *sq,
 		    struct mt76_txq *mtxq)
 {
 	struct ieee80211_txq *txq = mtxq_to_txq(mtxq);
-	enum mt76_txq_id qid = mt76_txq_get_qid(txq);
 	struct mt76_wcid *wcid = mtxq->wcid;
 	struct mt76_queue *hwq = sq->q;
 	struct ieee80211_tx_info *info;
@@ -331,7 +331,7 @@ mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_sw_queue *sq,
 	ampdu = IEEE80211_SKB_CB(skb)->flags & IEEE80211_TX_CTL_AMPDU;
 	limit = ampdu ? 16 : 3;
 
-	idx = dev->queue_ops->tx_queue_skb(dev, qid, skb, wcid, txq->sta);
+	idx = dev->queue_ops->tx_queue_skb(dev, hwq, skb, wcid, txq->sta);
 
 	if (idx < 0)
 		return idx;
@@ -360,7 +360,7 @@ mt76_txq_send_burst(struct mt76_dev *dev, struct mt76_sw_queue *sq,
 
 		info->control.rates[0] = tx_rate;
 
-		idx = dev->queue_ops->tx_queue_skb(dev, qid, skb, wcid,
+		idx = dev->queue_ops->tx_queue_skb(dev, hwq, skb, wcid,
 						   txq->sta);
 		if (idx < 0)
 			return idx;

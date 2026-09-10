@@ -62,6 +62,10 @@ enum mt76_txq_id {
 	__MT_TXQ_MAX
 };
 
+enum mt76_mcuq_id {
+    __MT_MCUQ_MAX
+};
+
 enum mt76_rxq_id {
 	MT_RXQ_MAIN,
 	MT_RXQ_MCU,
@@ -421,6 +425,7 @@ struct mt76_dev {
 
 	struct list_head txwi_cache;
 	struct mt76_sw_queue q_tx[__MT_TXQ_MAX];
+	struct mt76_queue *q_mcu[__MT_MCUQ_MAX];
 	struct mt76_queue q_rx[__MT_RXQ_MAX];
 	const struct mt76_queue_ops *queue_ops;
 	int tx_dma_idx[4];
@@ -571,8 +576,39 @@ void mt76_seq_puts_array(struct seq_file *file, const char *str,
 
 int mt76_eeprom_init(struct mt76_dev *dev, int len);
 void mt76_eeprom_override(struct mt76_dev *dev);
-int mt76_init_tx_queue(struct mt76_dev *dev, int qid, int idx,
-		       int n_desc, int ring_base);
+struct mt76_queue *
+mt76_init_queue(struct mt76_dev *dev, int qid, int idx, int n_desc,
+		int ring_base);
+
+static inline int mt76_init_tx_queue(struct mt76_dev *dev, int qid, int idx,
+            		 int n_desc, int ring_base)
+{
+    struct mt76_queue *q;
+
+    q = mt76_init_queue(dev, qid, idx, n_desc, ring_base);
+    if (IS_ERR(q))
+        return PTR_ERR(q);
+
+    q->qid = qid;
+    dev->q_tx[qid].q = q;
+
+    return 0;
+}
+
+static inline int mt76_init_mcu_queue(struct mt76_dev *dev, int qid, int idx,
+					  int n_desc, int ring_base)
+{
+    struct mt76_queue *q;
+
+    q = mt76_init_queue(dev, qid, idx, n_desc, ring_base);
+    if (IS_ERR(q))
+        return PTR_ERR(q);
+
+    q->qid = qid;
+    dev->q_mcu[qid] = q;
+
+    return 0;
+}
 
 static inline u8 *
 mt76_get_txwi_ptr(struct mt76_dev *dev, struct mt76_txwi_cache *t)

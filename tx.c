@@ -205,12 +205,6 @@ mt76_tx(struct mt76_dev *dev, struct ieee80211_sta *sta,
 	spin_lock_bh(&q->lock);
 	dev->queue_ops->tx_queue_skb(dev, q, skb, wcid, sta);
 	dev->queue_ops->kick(dev, q);
-
-	if (q->queued > q->ndesc - 8 && !q->stopped) {
-		ieee80211_stop_queue(dev->hw, skb_get_queue_mapping(skb));
-		q->stopped = true;
-	}
-
 	spin_unlock_bh(&q->lock);
 }
 EXPORT_SYMBOL_GPL(mt76_tx);
@@ -399,6 +393,9 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 			break;
 		}
 
+		if (hwq->stopped || hwq->blocked)
+            break;
+
 		txq = ieee80211_next_txq(dev->hw, qid);
 		if (!txq)
 			break;
@@ -430,16 +427,60 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 	return ret;
 }
 
+static void
+__mt76_tx_check_hwq_stop(struct mt76_dev *dev, struct mt76_queue *q,
+            bool stopped)
+{
+    int i;
+
+    for (i = 0; i < IEEE80211_NUM_ACS; i++) {
+        if (dev->q_tx[i].q != q)
+            continue;
+
+        if (stopped)
+            ieee80211_stop_queue(dev->hw, i);
+        else
+            ieee80211_wake_queue(dev->hw, i);
+    }
+}
+
+static bool
+mt76_tx_check_hwq_stop(struct mt76_queue *q)
+{
+    return q->blocked || q->queued >= q->ndesc - 8;
+}
+
+static void
+mt76_tx_update_hwq_stop(struct mt76_dev *dev, struct mt76_queue *q)
+{
+    bool stopped, prev_stopped;
+
+    stopped = mt76_tx_check_hwq_stop(q);
+    prev_stopped = q->stopped;
+    q->stopped = stopped;
+
+    if (stopped == prev_stopped)
+        return;
+
+    __mt76_tx_check_hwq_stop(dev, q, stopped);
+}
+
 void mt76_txq_schedule(struct mt76_dev *dev, enum mt76_txq_id qid)
 {
 	struct mt76_sw_queue *sq = &dev->q_tx[qid];
-	int len;
+    struct mt76_queue *q;
+    int len;
 
 	if (qid >= 4)
 		return;
 
 	if (sq->swq_queued >= 4)
 		return;
+
+	q = sq->q;
+    spin_lock_bh(&q->lock);
+    mt76_tx_update_hwq_stop(dev, q);
+    spin_unlock_bh(&q->lock);
 
 	rcu_read_lock();
 
@@ -558,6 +599,10 @@ void mt76_queue_tx_complete(struct mt76_dev *dev, struct mt76_queue *q,
 
     if (e->schedule)
         dev->q_tx[qid].swq_queued--;
+
+    if (q->stopped && !mt76_tx_check_hwq_stop(q))
+        mt76_worker_schedule(&dev->tx_worker);
+
     spin_unlock_bh(&q->lock);
 }
 EXPORT_SYMBOL_GPL(mt76_queue_tx_complete);

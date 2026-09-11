@@ -444,7 +444,6 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 void mt76_txq_schedule(struct mt76_dev *dev, enum mt76_txq_id qid)
 {
 	struct mt76_sw_queue *sq = &dev->q_tx[qid];
-    struct mt76_queue *q;
     int len;
 
 	if (qid >= 4)
@@ -452,8 +451,6 @@ void mt76_txq_schedule(struct mt76_dev *dev, enum mt76_txq_id qid)
 
 	if (sq->swq_queued >= 4)
 		return;
-
-	q = sq->q;
 
 	rcu_read_lock();
 

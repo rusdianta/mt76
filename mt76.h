@@ -19,6 +19,7 @@
 #define MT_MCU_RING_SIZE    32
 #define MT_RX_BUF_SIZE      2048
 #define MT_SKB_HEAD_LEN     128
+#define MT_TXQ_FREE_THR     32
 
 struct mt76_dev;
 struct mt76_wcid;
@@ -110,6 +111,7 @@ struct mt76_queue {
 	struct mt76_queue_regs __iomem *regs;
 
 	spinlock_t lock;
+	spinlock_t cleanup_lock;
 	struct mt76_queue_entry *entry;
 	struct mt76_desc *desc;
 

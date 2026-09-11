@@ -441,44 +441,6 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 	return ret;
 }
 
-static void
-__mt76_tx_check_hwq_stop(struct mt76_dev *dev, struct mt76_queue *q,
-            bool stopped)
-{
-    int i;
-
-    for (i = 0; i < IEEE80211_NUM_ACS; i++) {
-        if (dev->q_tx[i].q != q)
-            continue;
-
-        if (stopped)
-            ieee80211_stop_queue(dev->hw, i);
-        else
-            ieee80211_wake_queue(dev->hw, i);
-    }
-}
-
-static bool
-mt76_tx_check_hwq_stop(struct mt76_queue *q)
-{
-    return q->blocked || q->queued >= q->ndesc - 8;
-}
-
-static void
-mt76_tx_update_hwq_stop(struct mt76_dev *dev, struct mt76_queue *q)
-{
-    bool stopped, prev_stopped;
-
-    stopped = mt76_tx_check_hwq_stop(q);
-    prev_stopped = q->stopped;
-    q->stopped = stopped;
-
-    if (stopped == prev_stopped)
-        return;
-
-    __mt76_tx_check_hwq_stop(dev, q, stopped);
-}
-
 void mt76_txq_schedule(struct mt76_dev *dev, enum mt76_txq_id qid)
 {
 	struct mt76_sw_queue *sq = &dev->q_tx[qid];
@@ -492,9 +454,6 @@ void mt76_txq_schedule(struct mt76_dev *dev, enum mt76_txq_id qid)
 		return;
 
 	q = sq->q;
-    spin_lock_bh(&q->lock);
-    mt76_tx_update_hwq_stop(dev, q);
-    spin_unlock_bh(&q->lock);
 
 	rcu_read_lock();
 
@@ -613,9 +572,6 @@ void mt76_queue_tx_complete(struct mt76_dev *dev, struct mt76_queue *q,
 
     if (e->schedule)
         dev->q_tx[qid].swq_queued--;
-
-    if (q->stopped && !mt76_tx_check_hwq_stop(q))
-        mt76_worker_schedule(&dev->tx_worker);
 
     spin_unlock_bh(&q->lock);
 }

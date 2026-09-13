@@ -311,6 +311,8 @@ mt76_alloc_device(struct device *pdev, unsigned int size,
 	init_waitqueue_head(&dev->tx_wait);
 
 	INIT_LIST_HEAD(&dev->wcid_list);
+	INIT_LIST_HEAD(&dev->sta_poll_list);
+	spin_lock_init(&dev->sta_poll_lock);
 
 	skb_queue_head_init(&dev->mcu.res_q);
 	init_waitqueue_head(&dev->mcu.wait);

@@ -474,6 +474,9 @@ struct mt76_dev {
 	struct mt76_wcid __rcu *wcid[MT76_N_WCIDS];
 	struct list_head wcid_list;
 
+	struct list_head sta_poll_list;
+	spinlock_t sta_poll_lock;
+
 	u8 macaddr[ETH_ALEN];
 	u32 rev;
 	unsigned long state;

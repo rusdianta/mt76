@@ -309,6 +309,8 @@ mt76_alloc_device(struct device *pdev, unsigned int size,
 	init_waitqueue_head(&dev->tx_wait);
 	skb_queue_head_init(&dev->status_list);
 
+	INIT_LIST_HEAD(&dev->wcid_list);
+
 	skb_queue_head_init(&dev->mcu.res_q);
 	init_waitqueue_head(&dev->mcu.wait);
 	mutex_init(&dev->mcu.mutex);
@@ -882,6 +884,7 @@ mt76_sta_add(struct mt76_dev *dev, struct ieee80211_vif *vif,
 	ewma_signal_init(&wcid->rssi);
 	rcu_assign_pointer(dev->wcid[wcid->idx], wcid);
 
+	mt76_packet_id_init(wcid);
 out:
 	mutex_unlock(&dev->mutex);
 
@@ -900,7 +903,8 @@ void __mt76_sta_remove(struct mt76_dev *dev, struct ieee80211_vif *vif,
 	if (dev->drv->sta_remove)
 		dev->drv->sta_remove(dev, vif, sta);
 
-	mt76_tx_status_check(dev, wcid, true);
+	mt76_packet_id_flush(dev, wcid);
+	
 	for (i = 0; i < ARRAY_SIZE(sta->txq); i++)
 		mt76_txq_remove(dev, sta->txq[i]);
 	mt76_wcid_free(dev->wcid_mask, idx);

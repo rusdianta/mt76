@@ -417,7 +417,9 @@ free:
 
 free_skb:
 	status.skb = tx_info.skb;
+	spin_lock_bh(&dev->rx_lock);
 	ieee80211_tx_status_ext(dev->hw, &status);
+	spin_unlock_bh(&dev->rx_lock);
 
 	return ret;
 }

@@ -476,17 +476,20 @@ mt76_dma_rx_cleanup(struct mt76_dev *dev, struct mt76_queue *q)
 {
 	struct page *page;
 	void *buf;
-	bool more;
-
-	spin_lock_bh(&q->lock);
+	bool more;	
 
 	do {
+		spin_lock_bh(&q->lock);
 		buf = mt76_dma_dequeue(dev, q, true, NULL, NULL, &more);
+		spin_unlock_bh(&q->lock);
+
 		if (!buf)
 			break;
 
 		skb_free_frag(buf);
 	} while (1);
+
+	spin_lock_bh(&q->lock);
 
 	if (q->rx_head) {
 		dev_kfree_skb(q->rx_head);

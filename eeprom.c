@@ -33,7 +33,7 @@ mt76_get_of_eeprom_data(struct mt76_dev *dev, int len)
 }
 
 static int
-mt76_get_of_epprom_from_mtd(struct mt76_dev *dev, int len)
+mt76_get_of_eeprom_from_mtd(struct mt76_dev *dev, int len)
 {
 #ifdef CONFIG_MTD
 	struct device_node *np = dev->dev->of_node;
@@ -118,7 +118,7 @@ out_put_mtd:
 }
 
 static int
-mt76_get_of_epprom_from_nvmem(struct mt76_dev *dev, int len)
+mt76_get_of_eeprom_from_nvmem(struct mt76_dev *dev, int len)
 {
 	struct device_node *np = dev->dev->of_node;
 	struct nvmem_cell *cell;
@@ -162,11 +162,11 @@ mt76_get_of_eeprom(struct mt76_dev *dev, int len)
 	if (!ret)
 		return 0;
 
-	ret = mt76_get_of_epprom_from_mtd(dev, len);
+	ret = mt76_get_of_eeprom_from_mtd(dev, len);
 	if (!ret)
 		return 0;
 
-	return mt76_get_of_epprom_from_nvmem(dev, len);
+	return mt76_get_of_eeprom_from_nvmem(dev, len);
 }
 
 void

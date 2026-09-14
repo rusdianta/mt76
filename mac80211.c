@@ -105,6 +105,21 @@ static int mt76_led_init(struct mt76_dev *dev)
 	if (!dev->led_cdev.brightness_set && !dev->led_cdev.blink_set)
 		return 0;
 
+	np = of_get_child_by_name(np, "led");
+	if (np) {
+		if (!of_device_is_available(np)) {
+			of_node_put(np);
+			dev_info(dev->dev,
+				 "led registration was explicitly disabled by dts\n");
+			return 0;
+		}
+
+		if (!of_property_read_u32(np, "led-sources", &led_pin))
+			dev->led_pin = led_pin;
+		dev->led_al = of_property_read_bool(np, "led-active-low");
+		of_node_put(np);
+	}
+
 	snprintf(dev->led_name, sizeof(dev->led_name),
 		 "mt76-%s", wiphy_name(hw->wiphy));
 
@@ -114,14 +129,6 @@ static int mt76_led_init(struct mt76_dev *dev)
 					IEEE80211_TPT_LEDTRIG_FL_RADIO,
 					mt76_tpt_blink,
 					ARRAY_SIZE(mt76_tpt_blink));
-
-	np = of_get_child_by_name(np, "led");
-	if (np) {
-		if (!of_property_read_u32(np, "led-sources", &led_pin))
-			dev->led_pin = led_pin;
-		dev->led_al = of_property_read_bool(np, "led-active-low");
-		of_node_put(np);
-	}
 
 	return led_classdev_register(dev->dev, &dev->led_cdev);
 }

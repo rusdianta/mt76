@@ -10,13 +10,34 @@
 #include "mt76.h"
 
 static int
-mt76_get_of_eeprom(struct mt76_dev *dev, int len)
+mt76_get_of_eeprom_data(struct mt76_dev *dev, int len)
 {
-#if defined(CONFIG_OF) && defined(CONFIG_MTD)
+	struct device_node *np = dev->dev->of_node;
+	const void *data;
+	int size;
+
+	if (!np)
+		return -ENOENT;
+
+	data = of_get_property(np, "mediatek,eeprom-data", &size);
+	if (!data)
+		return -ENOENT;
+
+	if (size > len)
+		return -EINVAL;
+
+	memcpy(dev->eeprom.data, data, size);
+
+	return 0;
+}
+
+static int
+mt76_get_of_epprom_from_mtd(struct mt76_dev *dev, int len)
+{
+#ifdef CONFIG_MTD
 	struct device_node *np = dev->dev->of_node;
 	struct mtd_info *mtd;
 	const __be32 *list;
-	const void *data;
 	const char *part;
 	phandle phandle;
 	int offset = 0;
@@ -26,16 +47,6 @@ mt76_get_of_eeprom(struct mt76_dev *dev, int len)
 
 	if (!np)
 		return -ENOENT;
-
-	data = of_get_property(np, "mediatek,eeprom-data", &size);
-    if (data) {
-        if (size > len)
-            return -EINVAL;
-
-        memcpy(dev->eeprom.data, data, size);
-
-        return 0;
-    }
 
     list = of_get_property(np, "mediatek,mtd-eeprom", &size);
     if (!list) {
@@ -56,13 +67,13 @@ mt76_get_of_eeprom(struct mt76_dev *dev, int len)
 
 	mtd = get_mtd_device_nm(part);
 	if (IS_ERR(mtd)) {
-		ret =  PTR_ERR(mtd);
+		ret = PTR_ERR(mtd);
 		goto out_put_node;
 	}
 
 	if (size <= sizeof(*list)) {
 		ret = -EINVAL;
-		goto out_put_node;
+		goto out_put_mtd;
 	}
 
 	offset += be32_to_cpup(list);
@@ -85,7 +96,6 @@ mt76_get_of_eeprom(struct mt76_dev *dev, int len)
 		u8 *data = (u8 *)dev->eeprom.data;
 		int i;
 
-		/* convert eeprom data in Little Endian */
 		for (i = 0; i < round_down(len, 2); i += 2)
 			put_unaligned_le16(get_unaligned_be16(&data[i]),
 					   &data[i]);
@@ -93,10 +103,33 @@ mt76_get_of_eeprom(struct mt76_dev *dev, int len)
 
 out_put_node:
 	of_node_put(np);
+
+	return ret;
+
+out_put_mtd:
+	put_mtd_device(mtd);
+	of_node_put(np);
+
 	return ret;
 #else
 	return -ENOENT;
 #endif
+}
+
+static int
+mt76_get_of_eeprom(struct mt76_dev *dev, int len)
+{
+	struct device_node *np = dev->dev->of_node;
+	int ret;
+
+	if (!np)
+		return -ENOENT;
+
+	ret = mt76_get_of_eeprom_data(dev, len);
+	if (!ret)
+		return 0;
+
+	return mt76_get_of_epprom_from_mtd(dev, len);
 }
 
 void

@@ -6,6 +6,7 @@
 #include <linux/of_net.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
+#include <linux/nvmem-consumer.h>
 #include <linux/etherdevice.h>
 #include "mt76.h"
 
@@ -117,6 +118,38 @@ out_put_mtd:
 }
 
 static int
+mt76_get_of_epprom_from_nvmem(struct mt76_dev *dev, int len)
+{
+	struct device_node *np = dev->dev->of_node;
+	struct nvmem_cell *cell;
+	const void *data;
+	size_t retlen;
+	int ret = 0;
+
+	cell = of_nvmem_cell_get(np, "eeprom");
+	if (IS_ERR(cell))
+		return PTR_ERR(cell);
+
+	data = nvmem_cell_read(cell, &retlen);
+	nvmem_cell_put(cell);
+
+	if (IS_ERR(data))
+		return PTR_ERR(data);
+
+	if (retlen < len) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	memcpy(dev->eeprom.data, data, len);
+
+exit:
+	kfree(data);
+
+	return ret;
+}
+
+static int
 mt76_get_of_eeprom(struct mt76_dev *dev, int len)
 {
 	struct device_node *np = dev->dev->of_node;
@@ -129,7 +162,11 @@ mt76_get_of_eeprom(struct mt76_dev *dev, int len)
 	if (!ret)
 		return 0;
 
-	return mt76_get_of_epprom_from_mtd(dev, len);
+	ret = mt76_get_of_epprom_from_mtd(dev, len);
+	if (!ret)
+		return 0;
+
+	return mt76_get_of_epprom_from_nvmem(dev, len);
 }
 
 void

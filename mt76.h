@@ -855,20 +855,7 @@ int mt76_mcu_send_firmware(struct mt76_dev *dev, int cmd, const void *data,
 			   int len);
 void mt76_set_irq_mask(struct mt76_dev *dev, u32 addr, u32 clear, u32 set);
 
-static inline void mt76_packet_id_init(struct mt76_wcid *wcid)
-{
-	INIT_LIST_HEAD(&wcid->list);
-	idr_init(&wcid->pktid);
-}
+void mt76_wcid_init(struct mt76_wcid *wcid);
+void mt76_wcid_cleanup(struct mt76_dev *dev, struct mt76_wcid *wcid);
 
-static inline void mt76_packet_id_flush(struct mt76_dev *dev, struct mt76_wcid *wcid)
-{
-	struct sk_buff_head list;
-
-	mt76_tx_status_lock(dev, &list);
-	mt76_tx_status_skb_get(dev, wcid, -1, &list);
-	mt76_tx_status_unlock(dev, &list);
-
-	idr_destroy(&wcid->pktid);
-}
 #endif

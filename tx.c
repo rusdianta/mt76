@@ -419,6 +419,9 @@ mt76_txq_schedule_list(struct mt76_dev *dev, enum mt76_txq_id qid)
 	struct mt76_wcid *wcid;
 	int ret = 0;
 
+	if (dev->hw->conf.flags & IEEE80211_CONF_OFFCHANNEL)
+		return 0;
+
 	while (1) {
 		int n_frames = 0;
 

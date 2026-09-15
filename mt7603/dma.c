@@ -29,7 +29,7 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
 	struct ieee80211_sta *sta;
 	struct mt7603_sta *msta;
 	struct mt76_wcid *wcid;
-	u8 tid = 0, hwq = 0;
+	u8 qid, tid = 0, hwq = 0;
 	void *priv;
 	int idx;
 	u32 val;
@@ -55,7 +55,7 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
 	hwq = wmm_queue_map[IEEE80211_AC_BE];
 
 	if (ieee80211_is_data_qos(hdr->frame_control)) {
-		u8 qid = tid_to_ac[tid];
+		qid = tid_to_ac[tid];
 
 		hwq = wmm_queue_map[qid];
 		skb_set_queue_mapping(skb, qid);

@@ -169,7 +169,7 @@ mt76_get_of_eeprom(struct mt76_dev *dev, int len)
 	return mt76_get_of_eeprom_from_nvmem(dev, len);
 }
 
-void
+int
 mt76_eeprom_override(struct mt76_dev *dev)
 {
 #ifdef CONFIG_OF
@@ -178,7 +178,15 @@ mt76_eeprom_override(struct mt76_dev *dev)
 
 	if (np)
 		mac = of_get_mac_address(np);
-	if (!IS_ERR_OR_NULL(mac))
+
+	if (IS_ERR(mac)) {
+		if (PTR_ERR(mac) == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
+
+		mac = NULL;
+	}
+
+	if (mac)
 		ether_addr_copy(dev->macaddr, mac);
 #endif
 
@@ -188,6 +196,8 @@ mt76_eeprom_override(struct mt76_dev *dev)
 			 "Invalid MAC address, using random address %pM\n",
 			 dev->macaddr);
 	}
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(mt76_eeprom_override);
 

@@ -434,15 +434,13 @@ free_skb:
 }
 
 static int
-mt76_dma_rx_fill(struct mt76_dev *dev, struct mt76_queue *q)
+mt76_dma_rx_fill_buf(struct mt76_dev *dev, struct mt76_queue *q)
 {
 	dma_addr_t addr;
 	void *buf;
 	int frames = 0;
 	int len = SKB_WITH_OVERHEAD(q->buf_size);
 	int offset = q->buf_offset;
-
-	spin_lock_bh(&q->lock);
 
 	while (q->queued < q->ndesc - 1) {
 		struct mt76_queue_buf qbuf;
@@ -466,7 +464,20 @@ mt76_dma_rx_fill(struct mt76_dev *dev, struct mt76_queue *q)
 	if (frames)
 		mt76_dma_kick_queue(dev, q);
 
-	spin_unlock_bh(&q->lock);
+    return frames;
+}
+
+static int
+mt76_dma_rx_fill(struct mt76_dev *dev, struct mt76_queue *q)
+{
+    int frames;
+
+    if (!q->ndesc)
+        return 0;
+
+    spin_lock_bh(&q->lock);
+    frames = mt76_dma_rx_fill_buf(dev, q);
+    spin_unlock_bh(&q->lock);
 
 	return frames;
 }

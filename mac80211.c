@@ -663,6 +663,8 @@ static struct ieee80211_sta *mt76_rx_convert(struct sk_buff *skb)
 	mstat = *((struct mt76_rx_status *)skb->cb);
 	memset(status, 0, sizeof(*status));
 
+	skb->priority = mstat.tid;
+
 	status->flag = mstat.flag;
 	status->freq = mstat.freq;
 	status->enc_flags = mstat.enc_flags;

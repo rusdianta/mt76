@@ -69,8 +69,18 @@ mt76_rx_aggr_check_release(struct mt76_rx_tid *tid, struct sk_buff_head *frames)
 	struct mt76_rx_status *status;
 	struct sk_buff *skb;
 	int start, idx, nframes;
+	unsigned long timeout;
 
 	if (!tid->nframes)
+		return;
+
+	timeout = tid->timeout;
+
+	/* Nothing has reached the timeout yet.
+	 *
+	 * oldest_time is the timestamp of the first frame currently
+	 * buffered in this reorder window. */
+	if (!time_after(jiffies, tid->oldest_time + timeout))
 		return;
 
 	mt76_rx_aggr_release_head(tid, frames);
@@ -88,8 +98,7 @@ mt76_rx_aggr_check_release(struct mt76_rx_tid *tid, struct sk_buff_head *frames)
 		nframes--;
 		status = (struct mt76_rx_status *)skb->cb;
 		if (!time_after32(jiffies,
-				  status->reorder_time +
-				  mt76_aggr_tid_to_timeo(tid->num)))
+				  status->reorder_time + timeout))
 			continue;
 
 		mt76_rx_aggr_release_frames(tid, frames, status->seqno);
@@ -237,6 +246,10 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	}
 
 	status->reorder_time = jiffies;
+
+	if (!tid->nframes)
+		tid->oldest_time = status->reorder_time;
+
 	tid->reorder_buf[idx] = skb;
 	tid->nframes++;
 	mt76_rx_aggr_release_head(tid, frames);
@@ -263,6 +276,7 @@ int mt76_rx_aggr_start(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tidno,
 	tid->head = ssn;
 	tid->size = size;
 	tid->num = tidno;
+	tid->timeout = mt76_aggr_tid_to_timeo(tidno);
 	INIT_DELAYED_WORK(&tid->reorder_work, mt76_rx_aggr_reorder_work);
 	spin_lock_init(&tid->lock);
 

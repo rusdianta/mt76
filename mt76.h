@@ -261,10 +261,12 @@ struct mt76_rx_tid {
 	spinlock_t lock;
 	struct delayed_work reorder_work;
 
+	unsigned long timeout;
+	unsigned long oldest_time;
+
 	u16 head;
 	u8 size;
 	u8 nframes;
-
 	u8 num;
 
 	u8 started:1, stopped:1, timer_pending:1;

@@ -114,7 +114,7 @@ mt76_rx_aggr_reorder_work(struct work_struct *work)
 					       reorder_work.work);
 	struct mt76_dev *dev = tid->dev;
 	struct sk_buff_head frames;
-	int nframes;
+	bool resched = false;
 
 	__skb_queue_head_init(&frames);
 
@@ -122,17 +122,29 @@ mt76_rx_aggr_reorder_work(struct work_struct *work)
 	rcu_read_lock();
 
 	spin_lock(&tid->lock);
-	mt76_rx_aggr_check_release(tid, &frames);
-	nframes = tid->nframes;
-	spin_unlock(&tid->lock);
 
-	if (nframes)
-		ieee80211_queue_delayed_work(tid->dev->hw, &tid->reorder_work,
-					     mt76_aggr_tid_to_timeo(tid->num));
-	mt76_rx_complete(dev, &frames, NULL);
+	/* The work item is now running, so the currently queued
+	 * timer is no longer pending. */
+	tid->timer_pending = false;
+
+	mt76_rx_aggr_check_release(tid, &frames);
+
+	/* If frames are still buffered, keep exactly one timer
+	 * pending for this TID. */
+	if (tid->nframes && !tid->timer_pending) {
+		tid->timer_pending = true;
+		resched = true;
+	}
+	
+	spin_unlock(&tid->lock);
 
 	rcu_read_unlock();
 	local_bh_enable();
+
+	if (resched)
+		ieee80211_queue_delayed_work(tid->dev->hw, &tid->reorder_work,
+					     tid->timeout);
+	mt76_rx_complete(dev, &frames, NULL);
 }
 
 static void
@@ -254,8 +266,12 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	tid->nframes++;
 	mt76_rx_aggr_release_head(tid, frames);
 
-	ieee80211_queue_delayed_work(tid->dev->hw, &tid->reorder_work,
-				     mt76_aggr_tid_to_timeo(tid->num));
+	if (!tid->timer_pending) {
+		tid->timer_pending = true;
+
+		ieee80211_queue_delayed_work(tid->dev->hw, &tid->reorder_work,
+						tid->timeout);
+	}
 
 out:
 	spin_unlock_bh(&tid->lock);
@@ -294,6 +310,8 @@ static void mt76_rx_aggr_shutdown(struct mt76_dev *dev, struct mt76_rx_tid *tid)
 	spin_lock_bh(&tid->lock);
 
 	tid->stopped = true;
+	tid->timer_pending = false;
+
 	for (i = 0; tid->nframes && i < size; i++) {
 		struct sk_buff *skb = tid->reorder_buf[i];
 

@@ -12,6 +12,17 @@ static unsigned long mt76_aggr_tid_to_timeo(u8 tidno)
 	return HZ / (tidno >= 4 ? 25 : 10);
 }
 
+static inline u16
+mt76_aggr_idx(struct mt76_rx_tid *tid, u16 seq)
+{
+	const u16 size = tid->size;
+
+	if (likely(is_power_of_2(size)))
+		return seq & (size - 1);
+
+	return seq % size;
+}
+
 static void
 mt76_aggr_release(struct mt76_rx_tid *tid, struct sk_buff_head *frames, int idx)
 {
@@ -36,7 +47,7 @@ mt76_rx_aggr_release_frames(struct mt76_rx_tid *tid,
 	int idx;
 
 	while (ieee80211_sn_less(tid->head, head)) {
-		idx = tid->head % tid->size;
+		idx = mt76_aggr_idx(tid, tid->head);
 		mt76_aggr_release(tid, frames, idx);
 	}
 }
@@ -44,11 +55,11 @@ mt76_rx_aggr_release_frames(struct mt76_rx_tid *tid,
 static void
 mt76_rx_aggr_release_head(struct mt76_rx_tid *tid, struct sk_buff_head *frames)
 {
-	int idx = tid->head % tid->size;
+	int idx = mt76_aggr_idx(tid, tid->head);
 
 	while (tid->reorder_buf[idx]) {
 		mt76_aggr_release(tid, frames, idx);
-		idx = tid->head % tid->size;
+		idx = mt76_aggr_idx(tid, tid->head);
 	}
 }
 
@@ -64,12 +75,12 @@ mt76_rx_aggr_check_release(struct mt76_rx_tid *tid, struct sk_buff_head *frames)
 
 	mt76_rx_aggr_release_head(tid, frames);
 
-	start = tid->head % tid->size;
+	start = mt76_aggr_idx(tid, tid->head);
 	nframes = tid->nframes;
 
-	for (idx = (tid->head + 1) % tid->size;
+	for (idx = mt76_aggr_idx(tid, tid->head + 1);
 	     idx != start && nframes;
-	     idx = (idx + 1) % tid->size) {
+	     idx = mt76_aggr_idx(tid, idx + 1)) {
 		skb = tid->reorder_buf[idx];
 		if (!skb)
 			continue;
@@ -217,7 +228,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 		mt76_rx_aggr_release_frames(tid, frames, head);
 	}
 
-	idx = seqno % size;
+	idx = mt76_aggr_idx(tid, seqno);
 
 	/* Discard if the current slot is already in use */
 	if (tid->reorder_buf[idx]) {

@@ -33,7 +33,7 @@ mt76_aggr_release(struct mt76_rx_tid *tid, struct sk_buff_head *frames, int idx)
 	tid->head = ieee80211_sn_inc(tid->head);
 
 	skb = tid->reorder_buf[idx];
-	if (!skb)
+	if (unlikely(!skb))
 		return;
 
 	tid->reorder_buf[idx] = NULL;

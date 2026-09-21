@@ -293,6 +293,12 @@ int mt76_rx_aggr_start(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tidno,
 {
 	struct mt76_rx_tid *tid;
 
+	if (!wcid || tidno >= IEEE80211_NUM_TIDS || !size)
+		return -EINVAL;
+
+	if (size > 64)
+		size = 64;
+
 	/* Allocate the new TID before stopping the old one.
 	 *
 	 * This is important: if allocation fails, the existing BA

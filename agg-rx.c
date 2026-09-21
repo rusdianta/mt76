@@ -238,12 +238,13 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	}
 
 	reorder_buf = tid->reorder_buf;
-	status->flag |= RX_FLAG_DUP_VALIDATED;
 
 	spin_lock_bh(&tid->lock);
 
 	if (tid->stopped)
 		goto out;
+
+	status->flag |= RX_FLAG_DUP_VALIDATED;
 
 	head = tid->head;
 	seqno = status->seqno;

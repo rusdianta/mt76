@@ -69,6 +69,7 @@ mt76_rx_aggr_check_release(struct mt76_rx_tid *tid, struct sk_buff_head *frames)
 	struct mt76_rx_status *status;
 	struct sk_buff *skb;
 	int start, idx, nframes;
+	u16 seq;
 	unsigned long timeout;
 
 	if (!tid->nframes)
@@ -88,9 +89,11 @@ mt76_rx_aggr_check_release(struct mt76_rx_tid *tid, struct sk_buff_head *frames)
 	start = mt76_aggr_idx(tid, tid->head);
 	nframes = tid->nframes;
 
-	for (idx = mt76_aggr_idx(tid, tid->head + 1);
-	     idx != start && nframes;
-	     idx = mt76_aggr_idx(tid, idx + 1)) {
+	for (seq = ieee80211_sn_inc(tid->head);
+	     mt76_aggr_idx(tid, seq) != start && nframes;
+	     seq = ieee80211_sn_inc(seq)) {
+		idx = mt76_aggr_idx(tid, seq);
+
 		skb = tid->reorder_buf[idx];
 		if (!skb)
 			continue;

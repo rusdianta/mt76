@@ -388,6 +388,9 @@ void mt76_rx_aggr_stop(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tidno)
 {
 	struct mt76_rx_tid *tid = NULL;
 
+	if (!wcid || tidno >= IEEE80211_NUM_TIDS)
+		return;
+
 	rcu_swap_protected(wcid->aggr[tidno], tid,
 			   lockdep_is_held(&dev->mutex));
 	if (tid) {

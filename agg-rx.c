@@ -164,9 +164,12 @@ mt76_rx_aggr_check_ctl(struct sk_buff *skb, struct sk_buff_head *frames)
 
 	status->tid = le16_to_cpu(bar->control) >> 12;
 	seqno = IEEE80211_SEQ_TO_SN(le16_to_cpu(bar->start_seq_num));
+
+	rcu_read_lock();
+
 	tid = rcu_dereference(wcid->aggr[status->tid]);
 	if (!tid)
-		return;
+		goto out;
 
 	spin_lock_bh(&tid->lock);
 	if (!tid->stopped) {
@@ -174,6 +177,9 @@ mt76_rx_aggr_check_ctl(struct sk_buff *skb, struct sk_buff_head *frames)
 		mt76_rx_aggr_release_head(tid, frames);
 	}
 	spin_unlock_bh(&tid->lock);
+
+out:
+	rcu_read_unlock();
 }
 
 void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
@@ -203,9 +209,13 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	if (ackp == IEEE80211_QOS_CTL_ACK_POLICY_NOACK)
 		return;
 
+	rcu_read_lock();
+
 	tid = rcu_dereference(wcid->aggr[status->tid]);
-	if (!tid)
+	if (!tid) {
+		rcu_read_unlock();
 		return;
+	}
 
 	status->flag |= RX_FLAG_DUP_VALIDATED;
 	spin_lock_bh(&tid->lock);
@@ -275,6 +285,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 
 out:
 	spin_unlock_bh(&tid->lock);
+	rcu_read_unlock();
 }
 
 int mt76_rx_aggr_start(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tidno,

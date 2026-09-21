@@ -4,12 +4,14 @@
  */
 #include "mt76.h"
 
-static unsigned long mt76_aggr_tid_to_timeo(u8 tidno)
+static inline unsigned long mt76_aggr_tid_to_timeo(u8 tidno)
 {
 	/* Currently voice traffic (AC_VO) always runs without aggregation,
 	 * no special handling is needed. AC_BE/AC_BK use tids 0-3. Just check
 	 * for non AC_BK/AC_BE and set smaller timeout for it. */
-	return HZ / (tidno >= 4 ? 25 : 10);
+	return max_t(unsigned long,
+		     HZ / (tidno >= 4 ? 25 : 10),
+		     1);
 }
 
 static inline u16

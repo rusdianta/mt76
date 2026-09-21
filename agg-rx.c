@@ -200,6 +200,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	struct mt76_wcid *wcid = status->wcid;
 	struct mt76_rx_tid *tid;
+	struct sk_buff *drop_skb = NULL;
 	bool sn_less;
 	u16 seqno, head, size;
 	u8 ackp, idx, tidno;
@@ -252,7 +253,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 
 	if (sn_less) {
 		__skb_unlink(skb, frames);
-		dev_kfree_skb(skb);
+		drop_skb = skb;
 		goto out;
 	}
 
@@ -278,7 +279,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 
 	/* Discard if the current slot is already in use */
 	if (tid->reorder_buf[idx]) {
-		dev_kfree_skb(skb);
+		drop_skb = skb;
 		goto out;
 	}
 
@@ -301,6 +302,9 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 out:
 	spin_unlock_bh(&tid->lock);
 	rcu_read_unlock();
+
+	if (drop_skb)
+		dev_kfree_skb(drop_skb);
 }
 
 int mt76_rx_aggr_start(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tidno,

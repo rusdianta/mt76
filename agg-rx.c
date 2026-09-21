@@ -293,11 +293,15 @@ int mt76_rx_aggr_start(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tidno,
 {
 	struct mt76_rx_tid *tid;
 
-	mt76_rx_aggr_stop(dev, wcid, tidno);
-
+	/* Allocate the new TID before stopping the old one.
+	 *
+	 * This is important: if allocation fails, the existing BA
+	 * session remains alive. */
 	tid = kzalloc(struct_size(tid, reorder_buf, size), GFP_KERNEL);
 	if (!tid)
 		return -ENOMEM;
+
+	mt76_rx_aggr_stop(dev, wcid, tidno);
 
 	tid->dev = dev;
 	tid->head = ssn;

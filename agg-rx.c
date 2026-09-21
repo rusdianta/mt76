@@ -141,10 +141,11 @@ mt76_rx_aggr_reorder_work(struct work_struct *work)
 	spin_unlock(&tid->lock);
 	rcu_read_unlock();	
 
+	mt76_rx_complete(dev, &frames, NULL);
+
 	if (resched)
 		ieee80211_queue_delayed_work(tid->dev->hw, &tid->reorder_work,
 					     tid->timeout);
-	mt76_rx_complete(dev, &frames, NULL);
 
 	local_bh_enable();
 }

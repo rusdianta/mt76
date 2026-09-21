@@ -354,6 +354,7 @@ EXPORT_SYMBOL_GPL(mt76_rx_aggr_start);
 static void mt76_rx_aggr_shutdown(struct mt76_rx_tid *tid)
 {
 	struct sk_buff_head frames;
+	struct sk_buff **reorder_buf = tid->reorder_buf;
 	u8 size = tid->size;
 	int i;
 
@@ -367,12 +368,12 @@ static void mt76_rx_aggr_shutdown(struct mt76_rx_tid *tid)
 	tid->timer_pending = false;
 
 	for (i = 0; tid->nframes && i < size; i++) {
-		struct sk_buff *skb = tid->reorder_buf[i];
+		struct sk_buff *skb = reorder_buf[i];
 
 		if (!skb)
 			continue;
 
-		tid->reorder_buf[i] = NULL;
+		reorder_buf[i] = NULL;
 		tid->nframes--;
 
 		__skb_queue_tail(&frames, skb);

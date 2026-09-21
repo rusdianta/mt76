@@ -200,6 +200,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	struct mt76_wcid *wcid = status->wcid;
 	struct mt76_rx_tid *tid;
+	struct sk_buff **reorder_buf;
 	struct sk_buff *drop_skb = NULL;
 	bool sn_less;
 	u16 seqno, head, size;
@@ -233,7 +234,9 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 		return;
 	}
 
+	reorder_buf = tid->reorder_buf;
 	status->flag |= RX_FLAG_DUP_VALIDATED;
+
 	spin_lock_bh(&tid->lock);
 
 	if (tid->stopped)
@@ -278,7 +281,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	idx = mt76_aggr_idx(tid, seqno);
 
 	/* Discard if the current slot is already in use */
-	if (tid->reorder_buf[idx]) {
+	if (reorder_buf[idx]) {
 		drop_skb = skb;
 		goto out;
 	}
@@ -288,7 +291,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	if (!tid->nframes)
 		tid->oldest_time = status->reorder_time;
 
-	tid->reorder_buf[idx] = skb;
+	reorder_buf[idx] = skb;
 	tid->nframes++;
 	mt76_rx_aggr_release_head(tid, frames);
 
@@ -296,7 +299,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 		tid->timer_pending = true;
 
 		ieee80211_queue_delayed_work(tid->dev->hw, &tid->reorder_work,
-						tid->timeout);
+					     tid->timeout);
 	}
 
 out:

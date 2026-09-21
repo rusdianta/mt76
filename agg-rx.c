@@ -287,7 +287,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	idx = mt76_aggr_idx(tid, seqno);
 
 	/* Discard if the current slot is already in use */
-	if (reorder_buf[idx]) {
+	if (unlikely(reorder_buf[idx])) {
 		drop_skb = skb;
 		goto out;
 	}

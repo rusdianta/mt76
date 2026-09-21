@@ -325,8 +325,11 @@ EXPORT_SYMBOL_GPL(mt76_rx_aggr_start);
 
 static void mt76_rx_aggr_shutdown(struct mt76_dev *dev, struct mt76_rx_tid *tid)
 {
+	struct sk_buff_head frames;
 	u8 size = tid->size;
 	int i;
+
+	__skb_queue_head_init(&frames);
 
 	spin_lock_bh(&tid->lock);
 
@@ -341,10 +344,13 @@ static void mt76_rx_aggr_shutdown(struct mt76_dev *dev, struct mt76_rx_tid *tid)
 
 		tid->reorder_buf[i] = NULL;
 		tid->nframes--;
-		dev_kfree_skb(skb);
+
+		__skb_queue_tail(&frames, skb);
 	}
 
 	spin_unlock_bh(&tid->lock);
+
+	dev_kfree_skb_list(&frames);
 
 	cancel_delayed_work_sync(&tid->reorder_work);
 }

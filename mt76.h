@@ -547,6 +547,18 @@ enum mt76_phy_type {
 
 extern struct ieee80211_rate mt76_rates[12];
 
+#ifndef HAVE_DEV_KFREE_SKB_LIST
+
+static inline void dev_kfree_skb_list(struct sk_buff_head *list)
+{
+	struct sk_buff *skb;
+
+	while ((skb = __skb_dequeue(list)))
+		dev_kfree_skb(skb);
+}
+
+#endif
+
 #define __mt76_rr(dev, ...)	(dev)->bus->rr((dev), __VA_ARGS__)
 #define __mt76_wr(dev, ...)	(dev)->bus->wr((dev), __VA_ARGS__)
 #define __mt76_rmw(dev, ...)	(dev)->bus->rmw((dev), __VA_ARGS__)

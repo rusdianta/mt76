@@ -154,7 +154,11 @@ mt76_rx_aggr_check_ctl(struct sk_buff *skb, struct sk_buff_head *frames)
 	struct ieee80211_bar *bar = (struct ieee80211_bar *)skb->data;
 	struct mt76_wcid *wcid = status->wcid;
 	struct mt76_rx_tid *tid;
+	u8 tidno;
 	u16 seqno;
+
+	if (skb->len < sizeof(*bar))
+		return;
 
 	if (!ieee80211_is_ctl(bar->frame_control))
 		return;
@@ -162,12 +166,20 @@ mt76_rx_aggr_check_ctl(struct sk_buff *skb, struct sk_buff_head *frames)
 	if (!ieee80211_is_back_req(bar->frame_control))
 		return;
 
-	status->tid = le16_to_cpu(bar->control) >> 12;
+	tidno = le16_to_cpu(bar->control) >> 12;
+
+	if (tidno >= IEEE80211_NUM_TIDS)
+		return;
+
+	status->tid = tidno;
 	seqno = IEEE80211_SEQ_TO_SN(le16_to_cpu(bar->start_seq_num));
+
+	if (!wcid)
+		return;
 
 	rcu_read_lock();
 
-	tid = rcu_dereference(wcid->aggr[status->tid]);
+	tid = rcu_dereference(wcid->aggr[tidno]);
 	if (!tid)
 		goto out;
 
@@ -187,16 +199,19 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	struct mt76_wcid *wcid = status->wcid;
-	struct ieee80211_sta *sta;
 	struct mt76_rx_tid *tid;
 	bool sn_less;
 	u16 seqno, head, size;
-	u8 ackp, idx;
+	u8 ackp, idx, tidno;
 
 	__skb_queue_tail(frames, skb);
 
-	sta = wcid_to_sta(wcid);
-	if (!sta)
+	if (!wcid)
+		return;
+
+	tidno = status->tid;
+
+	if (tidno >= IEEE80211_NUM_TIDS)
 		return;
 
 	if (!status->aggr) {
@@ -211,7 +226,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 
 	rcu_read_lock();
 
-	tid = rcu_dereference(wcid->aggr[status->tid]);
+	tid = rcu_dereference(wcid->aggr[tidno]);
 	if (!tid) {
 		rcu_read_unlock();
 		return;

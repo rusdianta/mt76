@@ -7,6 +7,15 @@
 
 #define AVG_PKT_SIZE	1024
 
+#define DIV_ROUND_UP_U64(n, d)				\
+({							\
+	u64 __n = (n);					\
+	u32 __d = (d);					\
+	__n += __d - 1;					\
+	do_div(__n, __d);				\
+	__n;						\
+})
+
 /* Number of bits for an average sized packet */
 #define MCS_NBITS (AVG_PKT_SIZE << 3)
 
@@ -188,6 +197,9 @@ mt76_calc_legacy_rate_duration(const struct ieee80211_rate *rate, bool short_pre
 {
 	u32 duration;
 
+	if (!rate->bitrate)
+		return 0;
+
 	switch (rate->hw_value >> 8) {
 	case MT_PHY_TYPE_CCK:
 		duration = 144 + 48; /* preamble + PLCP */
@@ -204,10 +216,9 @@ mt76_calc_legacy_rate_duration(const struct ieee80211_rate *rate, bool short_pre
 		return 0;
 	}
 
-	len <<= 3;
-	duration += (len * 10) / rate->bitrate;
+	duration += DIV_ROUND_UP_U64((u64)len * 80, rate->bitrate);
 
-	return duration;
+	return (u32)min_t(u64, duration, U32_MAX);
 }
 
 u32 mt76_calc_rx_airtime(struct mt76_dev *dev, struct mt76_rx_status *status,

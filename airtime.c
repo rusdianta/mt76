@@ -99,6 +99,11 @@ static const struct mcs_group airtime_mcs_groups[] = {
 	MCS_GROUP(2, 1, BW_40),
 };
 
+enum mt76_phy_encoding {
+	MT76_PHY_LEGACY,
+	MT76_PHY_HT,
+};
+
 static u32
 mt76_calc_legacy_rate_duration(const struct ieee80211_rate *rate, bool short_pre,
 			       int len)
@@ -129,44 +134,32 @@ mt76_calc_legacy_rate_duration(const struct ieee80211_rate *rate, bool short_pre
 	return (u32)min_t(u64, duration, U32_MAX);
 }
 
-u32 mt76_calc_rx_airtime(struct mt76_dev *dev, struct mt76_rx_status *status,
-			 int len)
+static u32
+mt76_calc_airtime(struct mt76_dev *dev, enum mt76_phy_encoding encoding, u8 band,
+		  int bw, bool sgi, bool sp, int rate_idx, int len)
 {
-	struct ieee80211_supported_band *sband;
 	const struct ieee80211_rate *rate;
-	bool sgi = status->enc_flags & RX_ENC_FLAG_SHORT_GI;
-	bool sp = status->enc_flags & RX_ENC_FLAG_SHORTPRE;
-	int bw, streams;
-	u32 duration;
-	int group, idx;
+	struct ieee80211_supported_band *sband;
+	u64 duration;
+	int streams;
+	int group;
+	int idx;
 
-	switch (status->bw) {
-	case RATE_INFO_BW_20:
-		bw = BW_20;
-		break;
-	case RATE_INFO_BW_40:
-		bw = BW_40;
-		break;
-	default:
-		WARN_ON_ONCE(1);
-		return 0;
-	}
-
-	switch (status->encoding) {
-	case RX_ENC_LEGACY:
-		if (WARN_ON_ONCE(status->band > NL80211_BAND_5GHZ))
+	switch (encoding) {
+	case MT76_PHY_LEGACY:
+		if (WARN_ON_ONCE(band > NL80211_BAND_5GHZ))
 			return 0;
 
-		sband = dev->hw->wiphy->bands[status->band];
-		if (!sband || status->rate_idx >= sband->n_bitrates)
+		sband = dev->hw->wiphy->bands[band];
+		if (!sband || rate_idx >= sband->n_bitrates)
 			return 0;
 
-		rate = &sband->bitrates[status->rate_idx];
+		rate = &sband->bitrates[rate_idx];
 
 		return mt76_calc_legacy_rate_duration(rate, sp, len);
-	case RX_ENC_HT:
-		streams = ((status->rate_idx >> 3) & 3) + 1;
-		idx = status->rate_idx & 7;
+	case MT76_PHY_HT:
+		streams = ((rate_idx >> 3) & 3) + 1;
+		idx = rate_idx & 7;
 		group = HT_GROUP_IDX(streams, sgi, bw);
 		break;
 	default:
@@ -188,41 +181,66 @@ u32 mt76_calc_rx_airtime(struct mt76_dev *dev, struct mt76_rx_status *status,
 	return duration;
 }
 
+u32 mt76_calc_rx_airtime(struct mt76_dev *dev, struct mt76_rx_status *status,
+			 int len)
+{
+	int bw;
+
+	switch (status->bw) {
+	case RATE_INFO_BW_20:
+		bw = BW_20;
+		break;
+	case RATE_INFO_BW_40:
+		bw = BW_40;
+		break;
+	default:
+		WARN_ON_ONCE(1);
+		return 0;
+	}
+
+	return mt76_calc_airtime(dev, status->encoding, status->band, bw,
+				 status->enc_flags & RX_ENC_FLAG_SHORT_GI,
+				 status->enc_flags & RX_ENC_FLAG_SHORTPRE,
+				 status->rate_idx, len);
+}
+
 u32 mt76_calc_tx_airtime(struct mt76_dev *dev, struct ieee80211_tx_info *info,
 			 int len)
 {
-	struct mt76_rx_status stat = {
-		.band = info->band,
-	};
-	u32 duration = 0;
+	u64 duration = 0;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(info->status.rates); i++) {
-		struct ieee80211_tx_rate *rate = &info->status.rates[i];
-		u32 cur_duration;
+		struct ieee80211_tx_rate *rate;
+		enum mt76_phy_encoding encoding;
+		bool sgi = false;
+		bool sp = false;
+		int bw;
+		int rate_idx;
+		u64 cur_duration;
+
+		rate = &info->status.rates[i];
 
 		if (rate->idx < 0 || !rate->count)
 			break;
 
 		if (rate->flags & IEEE80211_TX_RC_40_MHZ_WIDTH)
-			stat.bw = RATE_INFO_BW_40;
+			bw = BW_40;
 		else
-			stat.bw = RATE_INFO_BW_20;
+			bw = BW_20;
 
-		stat.enc_flags = 0;
-		if (rate->flags & IEEE80211_TX_RC_USE_SHORT_PREAMBLE)
-			stat.enc_flags |= RX_ENC_FLAG_SHORTPRE;
-		if (rate->flags & IEEE80211_TX_RC_SHORT_GI)
-			stat.enc_flags |= RX_ENC_FLAG_SHORT_GI;
+		sp = rate->flags & IEEE80211_TX_RC_USE_SHORT_PREAMBLE;
+		sgi = rate->flags & IEEE80211_TX_RC_SHORT_GI;
+		rate_idx = rate->idx;
 
-		stat.rate_idx = rate->idx;
 		if (rate->flags & IEEE80211_TX_RC_MCS) {
-			stat.encoding = RX_ENC_HT;
+			encoding = MT76_PHY_HT;
 		} else {
-			stat.encoding = RX_ENC_LEGACY;
+			encoding = MT76_PHY_LEGACY;
 		}
 
-		cur_duration = mt76_calc_rx_airtime(dev, &stat, len);
+		cur_duration = mt76_calc_airtime(dev, encoding, info->band, bw,
+					sgi, sp, rate_idx, len);
 		duration += cur_duration * rate->count;
 	}
 

@@ -145,6 +145,9 @@ mt76_calc_airtime(struct mt76_dev *dev, enum mt76_phy_encoding encoding, u8 band
 	int group;
 	int idx;
 
+	if (unlikely(len <= 0 || rate_idx < 0))
+		return 0;
+
 	switch (encoding) {
 	case MT76_PHY_LEGACY:
 		if (WARN_ON_ONCE(band > NL80211_BAND_5GHZ))
@@ -167,7 +170,10 @@ mt76_calc_airtime(struct mt76_dev *dev, enum mt76_phy_encoding encoding, u8 band
 		return 0;
 	}
 
-	if (WARN_ON_ONCE(streams > 4))
+	if (WARN_ON_ONCE(streams > MT_MAX_STREAMS))
+		return 0;
+
+	if (unlikely(group < 0 || group >= ARRAY_SIZE(airtime_mcs_groups)))
 		return 0;
 
 	duration = airtime_mcs_groups[group].duration[idx];

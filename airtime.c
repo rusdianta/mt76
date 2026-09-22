@@ -250,6 +250,6 @@ u32 mt76_calc_tx_airtime(struct mt76_dev *dev, struct ieee80211_tx_info *info,
 		duration += cur_duration * rate->count;
 	}
 
-	return duration;
+	return (u32)min_t(u64, duration, U32_MAX);
 }
 EXPORT_SYMBOL_GPL(mt76_calc_tx_airtime);

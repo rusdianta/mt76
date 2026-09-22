@@ -35,26 +35,16 @@
 
 #define BW_20			0
 #define BW_40			1
-#define BW_80			2
 
 /*
  * Define group sort order: HT40 -> SGI -> #streams
  */
-#define MT_MAX_STREAMS		4
+#define MT_MAX_STREAMS		2
 #define MT_HT_STREAM_GROUPS	4 /* BW(=2) * SGI(=2) */
-#define MT_VHT_STREAM_GROUPS	6 /* BW(=3) * SGI(=2) */
-
-#define MT_HT_GROUPS_NB	(MT_MAX_STREAMS *		\
-				 MT_HT_STREAM_GROUPS)
-#define MT_VHT_GROUPS_NB	(MT_MAX_STREAMS *		\
-				 MT_VHT_STREAM_GROUPS)
-#define MT_GROUPS_NB	(MT_HT_GROUPS_NB +	\
-				 MT_VHT_GROUPS_NB)
 
 #define MT_HT_GROUP_0	0
-#define MT_VHT_GROUP_0	(MT_HT_GROUP_0 + MT_HT_GROUPS_NB)
-
-#define MCS_GROUP_RATES		10
+#define MCS_GROUP_RATES		8
+#define MT_MAX_HT_MCS	(MT_MAX_STREAMS * MCS_GROUP_RATES)
 
 #define HT_GROUP_IDX(_streams, _sgi, _ht40)	\
 	MT_HT_GROUP_0 +			\
@@ -90,50 +80,6 @@
 	__MCS_GROUP(_streams, _sgi, _ht40,				\
 		    MCS_GROUP_SHIFT(_streams, _sgi, _ht40))
 
-#define VHT_GROUP_IDX(_streams, _sgi, _bw)				\
-	(MT_VHT_GROUP_0 +						\
-	 MT_MAX_STREAMS * 2 * (_bw) +				\
-	 MT_MAX_STREAMS * (_sgi) +				\
-	 (_streams) - 1)
-
-#define BW2VBPS(_bw, r3, r2, r1)					\
-	(_bw == BW_80 ? r3 : _bw == BW_40 ? r2 : r1)
-
-#define __VHT_GROUP(_streams, _sgi, _bw, _s)				\
-	[VHT_GROUP_IDX(_streams, _sgi, _bw)] = {			\
-	.shift = _s,							\
-	.duration = {							\
-		MCS_DURATION(_streams, _sgi,				\
-			     BW2VBPS(_bw,  117,  54,  26)) >> _s,	\
-		MCS_DURATION(_streams, _sgi,				\
-			     BW2VBPS(_bw,  234, 108,  52)) >> _s,	\
-		MCS_DURATION(_streams, _sgi,				\
-			     BW2VBPS(_bw,  351, 162,  78)) >> _s,	\
-		MCS_DURATION(_streams, _sgi,				\
-			     BW2VBPS(_bw,  468, 216, 104)) >> _s,	\
-		MCS_DURATION(_streams, _sgi,				\
-			     BW2VBPS(_bw,  702, 324, 156)) >> _s,	\
-		MCS_DURATION(_streams, _sgi,				\
-			     BW2VBPS(_bw,  936, 432, 208)) >> _s,	\
-		MCS_DURATION(_streams, _sgi,				\
-			     BW2VBPS(_bw, 1053, 486, 234)) >> _s,	\
-		MCS_DURATION(_streams, _sgi,				\
-			     BW2VBPS(_bw, 1170, 540, 260)) >> _s,	\
-		MCS_DURATION(_streams, _sgi,				\
-			     BW2VBPS(_bw, 1404, 648, 312)) >> _s,	\
-		MCS_DURATION(_streams, _sgi,				\
-			     BW2VBPS(_bw, 1560, 720, 346)) >> _s	\
-	}								\
-}
-
-#define VHT_GROUP_SHIFT(_streams, _sgi, _bw)				\
-	GROUP_SHIFT(MCS_DURATION(_streams, _sgi,			\
-				 BW2VBPS(_bw,  117,  54,  26)))
-
-#define VHT_GROUP(_streams, _sgi, _bw)					\
-	__VHT_GROUP(_streams, _sgi, _bw,				\
-		    VHT_GROUP_SHIFT(_streams, _sgi, _bw))
-
 struct mcs_group {
 	u8 shift;
 	u16 duration[MCS_GROUP_RATES];
@@ -142,53 +88,15 @@ struct mcs_group {
 static const struct mcs_group airtime_mcs_groups[] = {
 	MCS_GROUP(1, 0, BW_20),
 	MCS_GROUP(2, 0, BW_20),
-	MCS_GROUP(3, 0, BW_20),
-	MCS_GROUP(4, 0, BW_20),
 
 	MCS_GROUP(1, 1, BW_20),
 	MCS_GROUP(2, 1, BW_20),
-	MCS_GROUP(3, 1, BW_20),
-	MCS_GROUP(4, 1, BW_20),
 
 	MCS_GROUP(1, 0, BW_40),
 	MCS_GROUP(2, 0, BW_40),
-	MCS_GROUP(3, 0, BW_40),
-	MCS_GROUP(4, 0, BW_40),
 
 	MCS_GROUP(1, 1, BW_40),
 	MCS_GROUP(2, 1, BW_40),
-	MCS_GROUP(3, 1, BW_40),
-	MCS_GROUP(4, 1, BW_40),
-
-	VHT_GROUP(1, 0, BW_20),
-	VHT_GROUP(2, 0, BW_20),
-	VHT_GROUP(3, 0, BW_20),
-	VHT_GROUP(4, 0, BW_20),
-
-	VHT_GROUP(1, 1, BW_20),
-	VHT_GROUP(2, 1, BW_20),
-	VHT_GROUP(3, 1, BW_20),
-	VHT_GROUP(4, 1, BW_20),
-
-	VHT_GROUP(1, 0, BW_40),
-	VHT_GROUP(2, 0, BW_40),
-	VHT_GROUP(3, 0, BW_40),
-	VHT_GROUP(4, 0, BW_40),
-
-	VHT_GROUP(1, 1, BW_40),
-	VHT_GROUP(2, 1, BW_40),
-	VHT_GROUP(3, 1, BW_40),
-	VHT_GROUP(4, 1, BW_40),
-
-	VHT_GROUP(1, 0, BW_80),
-	VHT_GROUP(2, 0, BW_80),
-	VHT_GROUP(3, 0, BW_80),
-	VHT_GROUP(4, 0, BW_80),
-
-	VHT_GROUP(1, 1, BW_80),
-	VHT_GROUP(2, 1, BW_80),
-	VHT_GROUP(3, 1, BW_80),
-	VHT_GROUP(4, 1, BW_80),
 };
 
 static u32
@@ -239,9 +147,6 @@ u32 mt76_calc_rx_airtime(struct mt76_dev *dev, struct mt76_rx_status *status,
 	case RATE_INFO_BW_40:
 		bw = BW_40;
 		break;
-	case RATE_INFO_BW_80:
-		bw = BW_80;
-		break;
 	default:
 		WARN_ON_ONCE(1);
 		return 0;
@@ -259,11 +164,6 @@ u32 mt76_calc_rx_airtime(struct mt76_dev *dev, struct mt76_rx_status *status,
 		rate = &sband->bitrates[status->rate_idx];
 
 		return mt76_calc_legacy_rate_duration(rate, sp, len);
-	case RX_ENC_VHT:
-		streams = status->nss;
-		idx = status->rate_idx;
-		group = VHT_GROUP_IDX(streams, sgi, bw);
-		break;
 	case RX_ENC_HT:
 		streams = ((status->rate_idx >> 3) & 3) + 1;
 		idx = status->rate_idx & 7;
@@ -304,9 +204,7 @@ u32 mt76_calc_tx_airtime(struct mt76_dev *dev, struct ieee80211_tx_info *info,
 		if (rate->idx < 0 || !rate->count)
 			break;
 
-		if (rate->flags & IEEE80211_TX_RC_80_MHZ_WIDTH)
-			stat.bw = RATE_INFO_BW_80;
-		else if (rate->flags & IEEE80211_TX_RC_40_MHZ_WIDTH)
+		if (rate->flags & IEEE80211_TX_RC_40_MHZ_WIDTH)
 			stat.bw = RATE_INFO_BW_40;
 		else
 			stat.bw = RATE_INFO_BW_20;
@@ -318,11 +216,7 @@ u32 mt76_calc_tx_airtime(struct mt76_dev *dev, struct ieee80211_tx_info *info,
 			stat.enc_flags |= RX_ENC_FLAG_SHORT_GI;
 
 		stat.rate_idx = rate->idx;
-		if (rate->flags & IEEE80211_TX_RC_VHT_MCS) {
-			stat.encoding = RX_ENC_VHT;
-			stat.rate_idx = ieee80211_rate_get_vht_mcs(rate);
-			stat.nss = ieee80211_rate_get_vht_nss(rate);
-		} else if (rate->flags & IEEE80211_TX_RC_MCS) {
+		if (rate->flags & IEEE80211_TX_RC_MCS) {
 			stat.encoding = RX_ENC_HT;
 		} else {
 			stat.encoding = RX_ENC_LEGACY;

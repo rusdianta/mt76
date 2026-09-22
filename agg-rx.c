@@ -123,7 +123,6 @@ mt76_rx_aggr_reorder_work(struct work_struct *work)
 
 	local_bh_disable();
 	rcu_read_lock();
-
 	spin_lock(&tid->lock);
 
 	/* The work item is now running, so the currently queued
@@ -140,14 +139,14 @@ mt76_rx_aggr_reorder_work(struct work_struct *work)
 	}
 	
 	spin_unlock(&tid->lock);
-
-	rcu_read_unlock();
-	local_bh_enable();
+	rcu_read_unlock();	
 
 	if (resched)
 		ieee80211_queue_delayed_work(tid->dev->hw, &tid->reorder_work,
 					     tid->timeout);
 	mt76_rx_complete(dev, &frames, NULL);
+
+	local_bh_enable();
 }
 
 static void

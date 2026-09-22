@@ -139,6 +139,7 @@ mt76_calc_airtime(struct mt76_dev *dev, enum mt76_phy_encoding encoding, u8 band
 		  int bw, bool sgi, bool sp, int rate_idx, int len)
 {
 	const struct ieee80211_rate *rate;
+	const struct mcs_group *g;
 	struct ieee80211_supported_band *sband;
 	u64 duration;
 	int streams;
@@ -176,15 +177,14 @@ mt76_calc_airtime(struct mt76_dev *dev, enum mt76_phy_encoding encoding, u8 band
 	if (unlikely(group < 0 || group >= ARRAY_SIZE(airtime_mcs_groups)))
 		return 0;
 
-	duration = airtime_mcs_groups[group].duration[idx];
-	duration <<= airtime_mcs_groups[group].shift;
-	duration *= len;
-	duration /= AVG_PKT_SIZE;
-	duration /= 1024;
+	g = &airtime_mcs_groups[group];
+
+	duration = (u64)g->duration[idx] << g->shift;
+	duration = DIV_ROUND_UP_U64(duration * len, AVG_PKT_SIZE << 10);
 
 	duration += 36 + (streams << 2);
 
-	return duration;
+	return (u32)min_t(u64, duration, U32_MAX);
 }
 
 u32 mt76_calc_rx_airtime(struct mt76_dev *dev, struct mt76_rx_status *status,

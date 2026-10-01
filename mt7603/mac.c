@@ -1653,9 +1653,13 @@ void mt7603_update_channel(struct mt76_dev *mdev)
 {
 	struct mt7603_dev *dev = container_of(mdev, struct mt7603_dev, mt76);
 	struct mt76_channel_state *state;
+	u32 cca;
 
 	state = mdev->chan_state;
-	state->cc_busy += mt76_rr(dev, MT_MIB_STAT_CCA);
+	cca = mt76_rr(dev, MT_MIB_STAT_CCA);
+	cca &= MT_MIB_STAT_CCA_MASK;
+
+	state->cc_busy += cca;
 }
 
 void
